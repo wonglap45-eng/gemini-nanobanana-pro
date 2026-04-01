@@ -1,199 +1,199 @@
 # 🍌 Gemini Nano Banana Plus
 
-A beautiful Next.js web application powered by Google's Gemini 2.5 Flash Image Preview model for AI image generation and editing.
+基于 Google Gemini 2.5 Flash Image Preview 模型打造的精美 AI 图像生成与编辑 Web 应用，使用 Next.js 构建。
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/xianyu110/gemini-nanobanana-plus)
 
-## ✨ Features
+## ✨ 功能特性
 
-### 🎨 AI Image Generation
-- **Text-to-Image**: Generate images from text descriptions
-- **Image Editing**: Upload images and edit them through natural conversation
-- **Multiple Styles**: Enhanced details, artistic, anime, and photorealistic styles
-- **Batch Generation**: Generate 1-4 images at once
+### 🎨 AI 图像生成
+- **文生图**：通过文字描述生成图像
+- **图像编辑**：上传图片后通过自然语言对话进行编辑
+- **多种风格**：增强细节、艺术风格、动漫风格、写实风格
+- **批量生成**：一次生成 1-4 张图片
 
-### 🎯 User Experience
-- **Beautiful UI**: Modern dark theme with gradient backgrounds and smooth animations
-- **Responsive Design**: Works perfectly on desktop and mobile devices  
-- **Real-time Preview**: Instant feedback and loading animations
-- **Multiple Modes**: Switch between upload and text generation modes
+### 🎯 用户体验
+- **精美界面**：现代化暗色主题，渐变背景搭配流畅动画
+- **响应式设计**：完美适配桌面端和移动端
+- **实时预览**：即时反馈和加载动画
+- **多模式切换**：上传模式和文生图模式自由切换
 
-### 🔧 Technical Features
-- **Next.js 14**: Server-side rendering and API routes
-- **TypeScript**: Type-safe development
-- **Multi-Model Support**: 
-  - **Gemini 2.5 Flash**: Google's latest AI model for image generation
-  - **Doubao SeedReam 4.0**: ByteDance's advanced image generation model
-- **Vercel Ready**: Optimized for seamless deployment
+### 🔧 ��术特性
+- **Next.js 14**：服务端渲染和 API 路由
+- **TypeScript**：类型安全开发
+- **多模型支持**：
+  - **Gemini 2.5 Flash**：Google 最新 AI 图像生成模型
+  - **Doubao SeedReam 4.0**：字节跳动高级图像生成模型
+- **Vercel 部署**：优化的一键部署方案
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-### Prerequisites
-- Node.js 18+ 
-- API keys for AI models:
-  - **Gemini API key** from [Google AI Studio](https://aistudio.google.com/app/apikey)
-  - **Doubao API key** from [Volcano Engine](https://console.volcengine.com/)
+### 前置要求
+- Node.js 18+
+- AI 模型 API 密钥：
+  - **Gemini API 密钥**：从 [Google AI Studio](https://aistudio.google.com/app/apikey) 获取
+  - **Doubao API 密钥**：从 [火山引擎](https://console.volcengine.com/) 获取
 
-### Installation
+### 安装步骤
 
-1. **Clone the repository**
+1. **克隆仓库**
    ```bash
    git clone https://github.com/xianyu110/gemini-nanobanana-plus.git
    cd gemini-nanobanana-plus
    ```
 
-2. **Install dependencies**
+2. **安装依赖**
    ```bash
    npm install
    ```
 
-3. **Configure environment variables**
+3. **配置环境变量**
    ```bash
    cp .env.example .env.local
    ```
-   Edit `.env.local` and add your API keys:
+   编辑 `.env.local` 并填入你的 API 密钥：
    ```
-   GEMINI_API_KEY=your_gemini_api_key_here
-   MAYNOR_API_KEY=your_doubao_api_key_here
+   GEMINI_API_KEY=你的_gemini_api_key
+   MAYNOR_API_KEY=你的_doubao_api_key
    MAYNOR_API_URL=https://apipro.maynor1024.live
    ```
 
-4. **Run the development server**
+4. **启动开发服务器**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+5. **打开浏览器**
+   访问 [http://localhost:3000](http://localhost:3000)
 
-## 🌐 Deploy to Vercel
+## 🌐 部署到 Vercel
 
-### One-Click Deploy
-Click the button above to deploy directly to Vercel.
+### 一键部署
+点击上方的 Vercel 按钮��可直接部署。
 
-### Manual Deployment
+### 手动部署
 
-1. **Fork this repository** on GitHub
+1. **Fork 本仓库**
 
-2. **Import to Vercel**
-   - Go to [vercel.com](https://vercel.com)
-   - Click "New Project"
-   - Import your forked repository
+2. **导入 Vercel**
+   - 访问 [vercel.com](https://vercel.com)
+   - 点击 "New Project"
+   - 导入你 Fork 的仓库
 
-3. **Configure Environment Variables**
-   In your Vercel project settings, add:
+3. **配置环境变量**
+   在 Vercel 项目设置中添加：
    ```
-   GEMINI_API_KEY=your_api_key_here
+   GEMINI_API_KEY=你的_api_key
    ```
 
-4. **Deploy**
-   Vercel will automatically build and deploy your project
+4. **部署**
+   Vercel 会自动构建并部署你的项目
 
-## 🎯 Usage Guide
+## 🎯 使用指南
 
-### Available Pages
-- **Main App**: `/nano` - Full-featured Nano Banana interface
-- **MVP Demo**: `/mvp` - Simple demo version
-- **Home**: `/` - Landing page
+### 页面说明
+- **主应用**：`/nano` - 完整功能的 Nano Banana 界面
+- **演示版**：`/mvp` - 简化演示版本
+- **首页**：`/` - 落地页
 
-### AI Model Selection
-Choose between two powerful AI models:
-- **🤖 Gemini 2.5 Flash**: Google's latest multimodal AI model
-- **🎨 Doubao SeedReam 4.0**: ByteDance's advanced image generation model
+### AI 模型选择
+支持两种强大的 AI 模型：
+- **🤖 Gemini 2.5 Flash**：Google 最新多模态 AI 模型
+- **🎨 Doubao SeedReam 4.0**：字节跳动高级图像生成模型
 
-### Text-to-Image Generation
-1. Select "文生图模式" (Text-to-Image mode)
-2. Choose your preferred AI model (Gemini or Doubao)
-3. Enter your description in Chinese or English
-4. Choose a style (Enhanced, Artistic, Anime, Photo)
-5. Select number of images to generate (1-4)
-6. Click "开始生成" (Start Generation)
+### 文生图
+1. 选择「文生图模式」
+2. 选择 AI 模型（Gemini 或 Doubao）
+3. 输入中文或英文描述
+4. 选择风格（增强、艺术、动漫、写实）
+5. 选择生成图片数量（1-4 张）
+6. 点击「开始生成」
 
-### Image Editing
-1. Select "通过对话编辑图像" (Image Editing mode)
-2. Choose your preferred AI model (Gemini or Doubao)
-3. Upload an image (PNG, JPG, WebP supported)
-4. Describe the changes you want to make
-5. Choose a style and generate
+### 图像编辑
+1. 选择「通过对话编辑图像」模式
+2. 选择 AI 模型（Gemini 或 Doubao）
+3. 上传图片（支持 PNG、JPG、WebP）
+4. 描述你想要的修改内容
+5. 选择风格并生成
 
-### Example Prompts
-- **中文**: "一只可爱的橘猫坐在彩虹桥上，梦幻风格，柔和光线"
-- **English**: "A cute orange cat sitting on a rainbow bridge, dreamy style, soft lighting"
-- **编辑**: "将这张图片转换为油画风格，增加温暖色调"
+### 示例提示词
+- "一只可爱的橘猫坐在彩虹桥上，梦幻风格，柔和光线"
+- "A cute orange cat sitting on a rainbow bridge, dreamy style, soft lighting"
+- "将这张图片转换为油画风格，���加温暖色调"
 
-## 🛠️ Development
+## 🛠️ 开发
 
-### Project Structure
+### 项目结构
 ```
 gemini-nano-banana/
 ├── app/
 │   ├── api/
-│   │   ├── gemini/          # Main Gemini API endpoint
-│   │   ├── generate/        # Alternative generation endpoint
-│   │   └── generate-demo/   # Demo endpoint
-│   ├── nano/                # Main application page
-│   ├── mvp/                 # MVP demo page
-│   └── layout.tsx           # Root layout
-├── public/                  # Static assets
-├── .env.example            # Environment variables template
-├── vercel.json            # Vercel deployment config
-└── README.md              # Project documentation
+│   │   ├── gemini/          # Gemini API 端点
+│   │   ├── generate/        # 备用生成端点
+│   │   └── generate-demo/   # 演示端点
+│   ├── nano/                # 主应用页面
+│   ├── mvp/                 # MVP 演示页面
+│   └── layout.tsx           # 根布局
+├── public/                  # 静态资源
+├── .env.example            # 环境变量模板
+├── vercel.json            # Vercel 部署配置
+└── README.md              # 项目文档
 ```
 
-### Available Scripts
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
+### 可用脚本
+- `npm run dev` - 启动开发服务器
+- `npm run build` - 生产环境构建
+- `npm run start` - 启动生产服务器
 
-### API Endpoints
-- `/api/gemini` - Gemini 2.5 Flash image generation API
-- `/api/doubao` - Doubao SeedReam 4.0 image generation API
-- `/api/generate` - Alternative generation endpoint
-- `/api/generate-demo` - Demo endpoint
+### API 端点
+- `/api/gemini` - Gemini 2.5 Flash 图像生成 API
+- `/api/doubao` - Doubao SeedReam 4.0 图像生成 API
+- `/api/generate` - 备用生成端点
+- `/api/generate-demo` - 演示端点
 
-## 🔑 Environment Variables
+## 🔑 环境变量
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `GEMINI_API_KEY` | Your Gemini API key from Google AI Studio | ✅ |
-| `MAYNOR_API_KEY` | Your Doubao API key from Volcano Engine | ✅ |
-| `MAYNOR_API_URL` | Doubao API base URL | ✅ |
+| 变量 | 说明 | 是否必需 |
+|------|------|----------|
+| `GEMINI_API_KEY` | Google AI Studio 的 Gemini API 密钥 | ✅ |
+| `MAYNOR_API_KEY` | 火山引擎的 Doubao API 密钥 | ✅ |
+| `MAYNOR_API_URL` | Doubao API 基础地址 | ✅ |
 
-## 🌟 UI Features
+## 🌟 界面��性
 
-### 🍌 Nano Banana Interface
-- **Modern Dark Theme**: Eye-friendly design with gradient backgrounds
-- **Smooth Animations**: Hover effects and loading animations
-- **Responsive Layout**: Perfect on desktop and mobile
-- **Interactive Elements**: Enhanced buttons, inputs, and cards
+### 🍌 Nano Banana 界面
+- **现代暗色主题**：护眼的渐变背景设计
+- **流畅动画**：悬停效果和加载动画
+- **响���式布局**：桌面端和移动端完美适配
+- **交互元素**：增强的按钮、输入框和卡片
 
-### Visual Elements
-- **Gradient Cards**: Beautiful background gradients
-- **Glowing Effects**: Subtle shadows and glows
-- **Smooth Transitions**: 0.3s ease transitions throughout
-- **Loading States**: Rotating gear icon and pulse animations
+### 视觉效果
+- **渐变卡片**：精美的背景渐变
+- **发光效果**：微妙的阴影和光晕
+- **平滑过渡**：全局 0.3s 缓动过渡
+- **加载状态**：旋转齿轮图标和脉冲动画
 
-## 📝 License
+## 📝 许可证
 
-This project is open source and available under the [MIT License](LICENSE).
+本项目基于 [MIT 许可证](LICENSE) 开源。
 
-## 🤝 Contributing
+## 🤝 参与贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎贡献！请随时提交 Pull Request。
 
-## 💡 Support
+## 💡 支持
 
-If you encounter any issues or have questions:
-1. Check the [Issues](https://github.com/xianyu110/gemini-nanobanana-plus/issues) page
-2. Create a new issue with detailed information
-3. Join our community discussions
+如果遇到任何问题或有疑问：
+1. 查看 [Issues](https://github.com/xianyu110/gemini-nanobanana-plus/issues) 页面
+2. 创建新 Issue 并附上详细信息
+3. 加入我们的社区讨论
 
-## 🌟 Acknowledgments
+## 🌟 致谢
 
-- [Google Gemini](https://gemini.google.com) for the powerful AI model
-- [Next.js](https://nextjs.org) for the amazing framework
-- [Vercel](https://vercel.com) for seamless deployment
+- [Google Gemini](https://gemini.google.com) - 强大的 AI 模型
+- [Next.js](https://nextjs.org) - 优秀的框架
+- [Vercel](https://vercel.com) - 无缝部署平台
 
 ---
 
-**Made with ❤️ using Google Gemini 2.5 Flash Image Preview**
+**使用 Google Gemini 2.5 Flash Image Preview 用心制作 ❤️**
