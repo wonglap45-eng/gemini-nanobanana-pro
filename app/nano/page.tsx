@@ -909,7 +909,7 @@ not "a near-duplicate remake of the reference image."` },
       {/* Main Content */}
       <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 2rem', maxWidth: '1680px', margin: '0 auto' }}>
         {/* 输入区域 - 三栏布局：上传参考图 | AI智能提示词 | 编辑风格 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr 430px', gap: '1.2rem' }}>
+        <div style={{ display: mode === 'upload' ? 'grid' : 'flex', flexDirection: mode === 'upload' ? undefined : 'column', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : undefined, gap: '1.2rem' }}>
         {/* Column 1: 上传参考图 */}
         <div className="col-upload">
           {mode === 'upload' ? (
