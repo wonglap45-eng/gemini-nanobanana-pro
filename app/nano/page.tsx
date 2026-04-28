@@ -910,8 +910,8 @@ not "a near-duplicate remake of the reference image."` },
       <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 2rem', maxWidth: '1680px', margin: '0 auto' }}>
         {/* 输入区域 - 三栏布局：上传参考图 | AI智能提示词 | 编辑风格 */}
         <div style={{ display: mode === 'upload' ? 'grid' : 'flex', flexDirection: mode === 'upload' ? undefined : 'column', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : undefined, gap: '1.2rem' }}>
-        {/* Column 1: 上传参考图 */}
-        <div className="col-upload">
+        {/* Column 1: 上传参考图 — text模式横跨全宽 */}
+        <div className="col-upload" style={{ gridColumn: mode === 'upload' ? undefined : '1 / -1' }}>
           {mode === 'upload' ? (
             <>
             <div
@@ -1962,8 +1962,8 @@ not "a near-duplicate remake of the reference image."` },
 
         </div>
 
-        {/* Column 2: 🤖 AI智能提示词 */}
-        <div className="col-ai-prompt">
+        {/* Column 2: 🤖 AI智能提示词 — 仅图生图模式显示 */}
+        <div className="col-ai-prompt" style={{ display: mode === 'upload' ? 'block' : 'none' }}>
 
           {/* ===== 🤖 AI智能提示词生成 — 独立模块 ===== */}
           <div style={{
@@ -2119,8 +2119,8 @@ not "a near-duplicate remake of the reference image."` },
 
         </div>{/* end col-ai-prompt */}
 
-        {/* Column 3: 🎨 编辑风格 + 其他 */}
-        <div className="col-edit">
+        {/* Column 3: 🎨 编辑风格 + 其他 — 仅图生图模式显示 */}
+        <div className="col-edit" style={{ display: mode === 'upload' ? 'block' : 'none' }}>
 
           <div style={{
             background: 'linear-gradient(135deg, #111111, #1a1a1a)',
