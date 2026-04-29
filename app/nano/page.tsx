@@ -909,7 +909,7 @@ not "a near-duplicate remake of the reference image."` },
       {/* Main Content */}
       <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 2rem', maxWidth: '1680px', margin: '0 auto' }}>
         {/* 输入区域 - 三栏布局：上传参考图 | AI智能提示词 | 编辑风格 */}
-        <div style={{ display: 'grid', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : '200px 1fr 430px', gap: '1.2rem' }}>
+        <div style={{ display: mode === 'upload' ? 'grid' : 'flex', flexDirection: mode === 'upload' ? undefined : 'column', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : undefined, gap: '1.2rem' }}>
         {/* Column 1: 上传参考图 */}
         <div className="col-upload">
           {mode === 'upload' ? (
@@ -1206,8 +1206,7 @@ not "a near-duplicate remake of the reference image."` },
             )}
             </>
           ) : (
-            /* Text mode: 只显示灵感发动（第1栏），AI输入区移到外面 */
-            <>
+            <div style={{ display: 'flex', gap: '2rem' }}>
               {/* Quick Prompts */}
               <div style={{
                 background: 'linear-gradient(135deg, #111111, #1a1a1a)',
@@ -1311,12 +1310,7 @@ not "a near-duplicate remake of the reference image."` },
                   </div>
                 )}
               </div>
-            </>
-          )}
 
-        {/* Column 2: 🖼️ AI图像生成 — 仅text模式（第2栏） */}
-        {mode !== 'upload' && (
-        <div style={{}}>
               {/* Text Input Area */}
               <div style={{ flex: 1 }}>
                 <div className="text-input-area" style={{
@@ -1634,9 +1628,9 @@ not "a near-duplicate remake of the reference image."` },
                 </div>
               </div>
             </div>
-        )} {/* end text-mode AI input column */}
+          )}
 
-        {/* 生成结果 - 横跨全宽 */}
+        {/* 生成结果 - 直接在左侧上传框下方 */}
         {result && (
         <div style={{
           marginTop: '1rem',
@@ -1969,7 +1963,7 @@ not "a near-duplicate remake of the reference image."` },
         </div>
 
         {/* Column 2: 🤖 AI智能提示词 */}
-        <div className="col-ai-prompt" style={{ gridColumn: mode === 'upload' ? undefined : '1 / -1' }}>
+        <div className="col-ai-prompt">
 
           {/* ===== 🤖 AI智能提示词生成 — 独立模块 ===== */}
           <div style={{
