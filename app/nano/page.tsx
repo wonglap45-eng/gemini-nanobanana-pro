@@ -908,10 +908,12 @@ not "a near-duplicate remake of the reference image."` },
 
       {/* Main Content */}
       <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 2rem', maxWidth: '1680px', margin: '0 auto' }}>
+      <style>{`.text-col-wide{grid-column:1/3}.text-col-3rd{grid-column:3;grid-row:1}.text-full-width{grid-column:1/-1}`}</style>
+
         {/* 输入区域 - 三栏布局：上传参考图 | AI智能提示词 | 编辑风格 */}
-        <div style={{ display: mode === 'upload' ? 'grid' : 'flex', flexDirection: mode === 'upload' ? undefined : 'column', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : undefined, gap: '1.2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : '200px 1fr 430px', gap: '1.2rem' }}>
         {/* Column 1: 上传参考图 */}
-        <div className="col-upload">
+        <div className={`col-upload${mode !== "upload" ? " text-col-wide" : ""}`}>
           {mode === 'upload' ? (
             <>
             <div
@@ -1630,340 +1632,12 @@ not "a near-duplicate remake of the reference image."` },
             </div>
           )}
 
-        {/* 生成结果 - 直接在左侧上传框下方 */}
-        {result && (
-        <div style={{
-          marginTop: '1rem',
-          background: 'linear-gradient(135deg, #111111, #1a1a1a)',
-          borderRadius: '1.5rem',
-          padding: '1.5rem',
-          border: '1px solid rgba(16, 185, 129, 0.15)'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
-            <h3 style={{
-              fontSize: '1.1rem',
-              background: 'linear-gradient(135deg, #10b981, #00d4ff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
-            ✨ 生成结果
-          </h3>
-          </div>
 
-          {/* 多图展示（新格式） */}
-          {result.images && result.images.length > 0 ? (
-            <div>
-              {/* 逐张生成中提示 */}
-              {loading && generateProgress && generateProgress.current <= generateProgress.total && (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '0.5rem',
-                  marginBottom: '0.8rem',
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(0,212,255,0.1))',
-                  borderRadius: '0.6rem',
-                  border: '1px solid rgba(16,185,129,0.3)'
-                }}>
-                  <span style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: 600 }}>
-                    ⏳ 正在生成第 {generateProgress.current}/{generateProgress.total} 张...
-                  </span>
-                </div>
-              )}
-              
-              {/* 图片计数 */}
-              {result.images.length > 1 && (
-                <div style={{ fontSize: '0.72rem', color: '#666', textAlign: 'center', marginBottom: '0.5rem' }}>
-                  共 {result.images.length} 张{result.requestedCount && result.requestedCount > result.images.length ? `（请求${result.requestedCount}张）` : ''}
-                </div>
-              )}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: result.images.length === 1 ? '1fr' : result.images.length === 3 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
-                gap: '0.8rem',
-                marginBottom: '0.8rem'
-              }}>
-                {result.images.map((img: any, idx: number) => (
-                  <div key={idx} style={{ 
-                    position: 'relative',
-                    textAlign: 'center',
-                    background: 'linear-gradient(135deg, #12121a, #18182a)',
-                    borderRadius: '0.75rem',
-                    padding: '0.5rem',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                  }}>
-                    {/* 图片 - 点击放大 */}
-                    <img
-                      id={`generated-image-${idx}`}
-                      className="result-image"
-                      src={`data:${img.mimeType || 'image/png'};base64,${img.imageData}`}
-                      alt={`Generated ${idx + 1}`}
-                      style={{
-                        width: '100%',
-                        maxHeight: '380px',
-                        borderRadius: '0.55rem',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-                        objectFit: 'contain',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s ease',
-                      }}
-                      onClick={() => setLightboxImage({ src: `data:${img.mimeType || 'image/png'};base64,${img.imageData}`, index: idx })}
-                      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-                    />
-                    {/* 🔍 放大标记 */}
-                    <span style={{
-                      position: 'absolute', top: '0.7rem', right: '0.7rem',
-                      background: 'rgba(0,0,0,0.6)', color: '#ccc', fontSize: '0.65rem',
-                      padding: '0.15rem 0.45rem', borderRadius: '0.3rem', pointerEvents: 'none',
-                    }}>🔍 点击放大</span>
-                    {/* 底部操作栏 */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      marginTop: '0.4rem', gap: '0.4rem',
-                    }}>
-                      <span style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>#{idx + 1}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); downloadImage(img.imageData, img.mimeType || 'image/png') }}
-                        style={{
-                          padding: '0.25rem 0.6rem', border: 'none', borderRadius: '0.35rem',
-                          background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',
-                          cursor: 'pointer', fontSize: '0.7rem', fontWeight: 500,
-                          display: 'flex', alignItems: 'center', gap: '0.25rem',
-                        }}
-                      >📥 下载</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Lightbox 放大弹窗 */}
-              {lightboxImage && (
-                <div
-                  onClick={() => setLightboxImage(null)}
-                  style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.92)', zIndex: 9999,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexDirection: 'column',
-                    animation: 'lightboxFadeIn 0.15s ease',
-                  }}
-                >
-                  {/* 关闭按钮 */}
-                  <button
-                    onClick={() => setLightboxImage(null)}
-                    style={{
-                      position: 'absolute', top: '1.2rem', right: '1.2rem',
-                      background: 'rgba(255,255,255,0.12)', border: 'none',
-                      color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
-                      borderRadius: '50%', cursor: 'pointer', zIndex: 10001,
-                    }}
-                  >✕</button>
-                  {/* 左右切换 */}
-                  {result.images.length > 1 && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const newIdx = lightboxImage.index === 0 ? result.images.length - 1 : lightboxImage.index - 1
-                          const prevImg = result.images[newIdx]
-                          setLightboxImage({ src: `data:${prevImg.mimeType || 'image/png'};base64,${prevImg.imageData}`, index: newIdx })
-                        }}
-                        style={{
-                          position: 'absolute', left: '1.2rem', top: '50%', transform: 'translateY(-50%)',
-                          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-                          color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
-                          cursor: 'pointer', zIndex: 10001,
-                        }}
-                      >◀</button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const newIdx = lightboxImage.index === result.images.length - 1 ? 0 : lightboxImage.index + 1
-                          const nextImg = result.images[newIdx]
-                          setLightboxImage({ src: `data:${nextImg.mimeType || 'image/png'};base64,${nextImg.imageData}`, index: newIdx })
-                        }}
-                        style={{
-                          position: 'absolute', right: '1.2rem', top: '50%', transform: 'translateY(-50%)',
-                          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-                          color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
-                          cursor: 'pointer', zIndex: 10001,
-                        }}
-                      >▶</button>
-                    </>
-                  )}
-                  {/* 大图 */}
-                  <img
-                    src={lightboxImage.src}
-                    alt="Preview"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain',
-                      borderRadius: '0.6rem', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                    }}
-                  />
-                  {/* 底部信息 */}
-                  <div style={{ color: '#888', fontSize: '0.82rem', marginTop: '1rem' }}>
-                    {lightboxImage.index + 1} / {result.images.length}
-                  </div>
-                  {/* 下载当前大图 */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const currentImg = result.images[lightboxImage.index]
-                      downloadImage(currentImg.imageData, currentImg.mimeType || 'image/png')
-                    }}
-                    style={{
-                      marginTop: '0.8rem', padding: '0.55rem 1.5rem',
-                      background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none',
-                      borderRadius: '0.5rem', color: 'white', cursor: 'pointer',
-                      fontSize: '0.85rem', fontWeight: 600,
-                    }}
-                  >📥 下载此图</button>
-                  <style>{`
-                    @keyframes lightboxFadeIn { from { opacity: 0; } to { opacity: 1; } }
-                  `}</style>
-                </div>
-              )}
-              <div style={{
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'center',
-                flexWrap: 'wrap'
-              }}>
-                {/* 下载全部按钮 */}
-                <button
-                  onClick={() => {
-                    result.images.forEach((img: any, idx: number) => {
-                      const imgEl = document.getElementById(`generated-image-${idx}`) as HTMLImageElement
-                      if (imgEl) {
-                        const canvas = document.createElement('canvas')
-                        const ctx = canvas.getContext('2d')
-                        canvas.width = imgEl.naturalWidth
-                        canvas.height = imgEl.naturalHeight
-                        ctx?.drawImage(imgEl, 0, 0)
-                        canvas.toBlob((blob) => {
-                          if (blob) {
-                            const url = URL.createObjectURL(blob)
-                            const a = document.createElement('a')
-                            a.href = url
-                            a.download = `nano-banana-${idx + 1}-${Date.now()}.png`
-                            document.body.appendChild(a)
-                            a.click()
-                            document.body.removeChild(a)
-                            URL.revokeObjectURL(url)
-                          }
-                        }, 'image/png')
-                      }
-                    })
-                  }}
-                  style={downloadBtnStyle}
-                >
-                  📥 下载全部 ({result.images?.length || 0}张)
-                </button>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  style={{
-                    padding: '0.6rem 1.2rem',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: '500',
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
-                  }}
-                >
-                  🔗 {t.result.share}
-                </button>
-              </div>
-            </div>
-          ) : result.imageData || result.imageUrl ? (
-            /* 单图展示（旧格式兼容） */
-            <div style={{ textAlign: 'center' }}>
-              <img
-                id="generated-image"
-                className="result-image"
-                src={result.imageUrl || `data:${result.mimeType};base64,${result.imageData}`}
-                alt="Generated"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '500px',
-                  borderRadius: '1rem',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
-                }}
-              />
-              <div style={{
-                marginTop: '0.8rem',
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'center'
-              }}>
-                <button
-                  onClick={() => {
-                    const img = document.getElementById('generated-image') as HTMLImageElement
-                    if (img) {
-                      const canvas = document.createElement('canvas')
-                      const ctx = canvas.getContext('2d')
-                      canvas.width = img.naturalWidth
-                      canvas.height = img.naturalHeight
-                      ctx?.drawImage(img, 0, 0)
-
-                      canvas.toBlob((blob) => {
-                        if (blob) {
-                          const url = URL.createObjectURL(blob)
-                          const a = document.createElement('a')
-                          a.href = url
-                          a.download = `nano-banana-${Date.now()}.png`
-                          document.body.appendChild(a)
-                          a.click()
-                          document.body.removeChild(a)
-                          URL.revokeObjectURL(url)
-                        }
-                      }, 'image/png')
-                    }
-                  }}
-                  style={downloadBtnStyle}
-                >
-                  📥 {t.result.download}
-                </button>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  style={{
-                    padding: '0.6rem 1.2rem',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: '500',
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
-                  }}
-                >
-                  🔗 {t.result.share}
-                </button>
-              </div>
-            </div>
-          ) : result.text || result.content || result.message ? (
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '0.75rem',
-              padding: '1.2rem',
-              textAlign: 'center'
-            }}>
-              <p style={{ fontSize: '0.95rem', color: '#ccc', lineHeight: '1.6' }}>
-                {result.text || result.content || result.message}
-              </p>
-            </div>
-          ) : null}
-        </div>
-        )}
 
         </div>
 
         {/* Column 2: 🤖 AI智能提示词 */}
-        <div className="col-ai-prompt">
+        <div className={`col-ai-prompt${mode !== "upload" ? " text-full-width" : ""}`}>
 
           {/* ===== 🤖 AI智能提示词生成 — 独立模块 ===== */}
           <div style={{
@@ -2120,7 +1794,7 @@ not "a near-duplicate remake of the reference image."` },
         </div>{/* end col-ai-prompt */}
 
         {/* Column 3: 🎨 编辑风格 + 其他 */}
-        <div className="col-edit">
+        <div className={`col-edit${mode !== "upload" ? " text-col-3rd" : ""}`}>
 
           <div style={{
             background: 'linear-gradient(135deg, #111111, #1a1a1a)',
@@ -2562,6 +2236,335 @@ not "a near-duplicate remake of the reference image."` },
           </div>
         </div>
         </div>
+        {/* 生成结果 - 直接在左侧上传框下方 */}
+        {result && (
+        <div className={`result-box${mode !== "upload" ? " text-full-width" : ""}`} style={{
+          marginTop: '1rem',
+          background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+          borderRadius: '1.5rem',
+          padding: '1.5rem',
+          border: '1px solid rgba(16, 185, 129, 0.15)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+            <h3 style={{
+              fontSize: '1.1rem',
+              background: 'linear-gradient(135deg, #10b981, #00d4ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+            ✨ 生成结果
+          </h3>
+          </div>
+
+          {/* 多图展示（新格式） */}
+          {result.images && result.images.length > 0 ? (
+            <div>
+              {/* 逐张生成中提示 */}
+              {loading && generateProgress && generateProgress.current <= generateProgress.total && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '0.5rem',
+                  marginBottom: '0.8rem',
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(0,212,255,0.1))',
+                  borderRadius: '0.6rem',
+                  border: '1px solid rgba(16,185,129,0.3)'
+                }}>
+                  <span style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: 600 }}>
+                    ⏳ 正在生成第 {generateProgress.current}/{generateProgress.total} 张...
+                  </span>
+                </div>
+              )}
+              
+              {/* 图片计数 */}
+              {result.images.length > 1 && (
+                <div style={{ fontSize: '0.72rem', color: '#666', textAlign: 'center', marginBottom: '0.5rem' }}>
+                  共 {result.images.length} 张{result.requestedCount && result.requestedCount > result.images.length ? `（请求${result.requestedCount}张）` : ''}
+                </div>
+              )}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: result.images.length === 1 ? '1fr' : result.images.length === 3 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+                gap: '0.8rem',
+                marginBottom: '0.8rem'
+              }}>
+                {result.images.map((img: any, idx: number) => (
+                  <div key={idx} style={{ 
+                    position: 'relative',
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, #12121a, #18182a)',
+                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    {/* 图片 - 点击放大 */}
+                    <img
+                      id={`generated-image-${idx}`}
+                      className="result-image"
+                      src={`data:${img.mimeType || 'image/png'};base64,${img.imageData}`}
+                      alt={`Generated ${idx + 1}`}
+                      style={{
+                        width: '100%',
+                        maxHeight: '380px',
+                        borderRadius: '0.55rem',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                        objectFit: 'contain',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease',
+                      }}
+                      onClick={() => setLightboxImage({ src: `data:${img.mimeType || 'image/png'};base64,${img.imageData}`, index: idx })}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                    />
+                    {/* 🔍 放大标记 */}
+                    <span style={{
+                      position: 'absolute', top: '0.7rem', right: '0.7rem',
+                      background: 'rgba(0,0,0,0.6)', color: '#ccc', fontSize: '0.65rem',
+                      padding: '0.15rem 0.45rem', borderRadius: '0.3rem', pointerEvents: 'none',
+                    }}>🔍 点击放大</span>
+                    {/* 底部操作栏 */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      marginTop: '0.4rem', gap: '0.4rem',
+                    }}>
+                      <span style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>#{idx + 1}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadImage(img.imageData, img.mimeType || 'image/png') }}
+                        style={{
+                          padding: '0.25rem 0.6rem', border: 'none', borderRadius: '0.35rem',
+                          background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',
+                          cursor: 'pointer', fontSize: '0.7rem', fontWeight: 500,
+                          display: 'flex', alignItems: 'center', gap: '0.25rem',
+                        }}
+                      >📥 下载</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Lightbox 放大弹窗 */}
+              {lightboxImage && (
+                <div
+                  onClick={() => setLightboxImage(null)}
+                  style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.92)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column',
+                    animation: 'lightboxFadeIn 0.15s ease',
+                  }}
+                >
+                  {/* 关闭按钮 */}
+                  <button
+                    onClick={() => setLightboxImage(null)}
+                    style={{
+                      position: 'absolute', top: '1.2rem', right: '1.2rem',
+                      background: 'rgba(255,255,255,0.12)', border: 'none',
+                      color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
+                      borderRadius: '50%', cursor: 'pointer', zIndex: 10001,
+                    }}
+                  >✕</button>
+                  {/* 左右切换 */}
+                  {result.images.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newIdx = lightboxImage.index === 0 ? result.images.length - 1 : lightboxImage.index - 1
+                          const prevImg = result.images[newIdx]
+                          setLightboxImage({ src: `data:${prevImg.mimeType || 'image/png'};base64,${prevImg.imageData}`, index: newIdx })
+                        }}
+                        style={{
+                          position: 'absolute', left: '1.2rem', top: '50%', transform: 'translateY(-50%)',
+                          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                          color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
+                          cursor: 'pointer', zIndex: 10001,
+                        }}
+                      >◀</button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newIdx = lightboxImage.index === result.images.length - 1 ? 0 : lightboxImage.index + 1
+                          const nextImg = result.images[newIdx]
+                          setLightboxImage({ src: `data:${nextImg.mimeType || 'image/png'};base64,${nextImg.imageData}`, index: newIdx })
+                        }}
+                        style={{
+                          position: 'absolute', right: '1.2rem', top: '50%', transform: 'translateY(-50%)',
+                          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                          color: '#fff', fontSize: '1.4rem', width: '2.8rem', height: '2.8rem',
+                          cursor: 'pointer', zIndex: 10001,
+                        }}
+                      >▶</button>
+                    </>
+                  )}
+                  {/* 大图 */}
+                  <img
+                    src={lightboxImage.src}
+                    alt="Preview"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain',
+                      borderRadius: '0.6rem', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                    }}
+                  />
+                  {/* 底部信息 */}
+                  <div style={{ color: '#888', fontSize: '0.82rem', marginTop: '1rem' }}>
+                    {lightboxImage.index + 1} / {result.images.length}
+                  </div>
+                  {/* 下载当前大图 */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const currentImg = result.images[lightboxImage.index]
+                      downloadImage(currentImg.imageData, currentImg.mimeType || 'image/png')
+                    }}
+                    style={{
+                      marginTop: '0.8rem', padding: '0.55rem 1.5rem',
+                      background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none',
+                      borderRadius: '0.5rem', color: 'white', cursor: 'pointer',
+                      fontSize: '0.85rem', fontWeight: 600,
+                    }}
+                  >📥 下载此图</button>
+                  <style>{`
+                    @keyframes lightboxFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                  `}</style>
+                </div>
+              )}
+              <div style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'center',
+                flexWrap: 'wrap'
+              }}>
+                {/* 下载全部按钮 */}
+                <button
+                  onClick={() => {
+                    result.images.forEach((img: any, idx: number) => {
+                      const imgEl = document.getElementById(`generated-image-${idx}`) as HTMLImageElement
+                      if (imgEl) {
+                        const canvas = document.createElement('canvas')
+                        const ctx = canvas.getContext('2d')
+                        canvas.width = imgEl.naturalWidth
+                        canvas.height = imgEl.naturalHeight
+                        ctx?.drawImage(imgEl, 0, 0)
+                        canvas.toBlob((blob) => {
+                          if (blob) {
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = `nano-banana-${idx + 1}-${Date.now()}.png`
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
+                            URL.revokeObjectURL(url)
+                          }
+                        }, 'image/png')
+                      }
+                    })
+                  }}
+                  style={downloadBtnStyle}
+                >
+                  📥 下载全部 ({result.images?.length || 0}张)
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  style={{
+                    padding: '0.6rem 1.2rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                  }}
+                >
+                  🔗 {t.result.share}
+                </button>
+              </div>
+            </div>
+          ) : result.imageData || result.imageUrl ? (
+            /* 单图展示（旧格式兼容） */
+            <div style={{ textAlign: 'center' }}>
+              <img
+                id="generated-image"
+                className="result-image"
+                src={result.imageUrl || `data:${result.mimeType};base64,${result.imageData}`}
+                alt="Generated"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '500px',
+                  borderRadius: '1rem',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
+                }}
+              />
+              <div style={{
+                marginTop: '0.8rem',
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => {
+                    const img = document.getElementById('generated-image') as HTMLImageElement
+                    if (img) {
+                      const canvas = document.createElement('canvas')
+                      const ctx = canvas.getContext('2d')
+                      canvas.width = img.naturalWidth
+                      canvas.height = img.naturalHeight
+                      ctx?.drawImage(img, 0, 0)
+
+                      canvas.toBlob((blob) => {
+                        if (blob) {
+                          const url = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = `nano-banana-${Date.now()}.png`
+                          document.body.appendChild(a)
+                          a.click()
+                          document.body.removeChild(a)
+                          URL.revokeObjectURL(url)
+                        }
+                      }, 'image/png')
+                    }
+                  }}
+                  style={downloadBtnStyle}
+                >
+                  📥 {t.result.download}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  style={{
+                    padding: '0.6rem 1.2rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                  }}
+                >
+                  🔗 {t.result.share}
+                </button>
+              </div>
+            </div>
+          ) : result.text || result.content || result.message ? (
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '0.75rem',
+              padding: '1.2rem',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '0.95rem', color: '#ccc', lineHeight: '1.6' }}>
+                {result.text || result.content || result.message}
+              </p>
+            </div>
+          ) : null}
+        </div>
+        )}
 
       </div>
       {error && (
