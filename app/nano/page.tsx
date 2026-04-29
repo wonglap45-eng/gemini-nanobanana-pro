@@ -908,7 +908,7 @@ not "a near-duplicate remake of the reference image."` },
 
       {/* Main Content */}
       <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 2rem', maxWidth: '1680px', margin: '0 auto' }}>
-      <style>{`.text-col-wide{grid-column:1/3}.text-col-3rd{grid-column:3;grid-row:1}.text-full-width{grid-column:1/-1}`}</style>
+      <style>{`.text-col-wide{grid-column:1/3}.text-col-3rd{grid-column:3;grid-row:1}.text-mode-hide{display:none}`}</style>
 
         {/* 输入区域 - 三栏布局：上传参考图 | AI智能提示词 | 编辑风格 */}
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'upload' ? '340px 1fr 430px' : '200px 1fr 430px', gap: '1.2rem' }}>
@@ -1313,6 +1313,86 @@ not "a near-duplicate remake of the reference image."` },
                 )}
               </div>
 
+              {/* 🤖 AI智能提示词 — 紧凑版 */}
+              <div style={{
+                background: 'linear-gradient(135deg, #0f0f1a, #16162a)',
+                borderRadius: '0.8rem',
+                padding: '0.6rem 0.8rem',
+                marginBottom: '0.7rem',
+                boxShadow: '0 3px 12px rgba(99,102,241,0.08)',
+                border: showAIPromptPanel ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(99,102,241,0.13)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.85rem' }}>🤖</span>
+                    <span style={{ fontSize: '0.78rem', background: 'linear-gradient(135deg, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>AI 智能提示词</span>
+                  </div>
+                  <button
+                    onClick={() => { setShowAIPromptPanel(!showAIPromptPanel); if (!showAIPromptPanel) setAiPromptResult(null) }}
+                    style={{ padding: '0.18rem 0.5rem', borderRadius: '0.35rem', border: 'none', background: showAIPromptPanel ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)', color: showAIPromptPanel ? '#f87171' : '#888', cursor: 'pointer', fontSize: '0.62rem', fontWeight: 500 }}
+                  >
+                    {showAIPromptPanel ? '✕ 收起' : '▶ 打开'}
+                  </button>
+                </div>
+
+                {!showAIPromptPanel ? (
+                  <div style={{ textAlign: 'center', padding: '0.5rem 0.3rem', background: 'rgba(99,102,241,0.04)', borderRadius: '0.5rem', border: '1px dashed rgba(99,102,241,0.18)', marginTop: '0.4rem' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#888' }}>描述需求，AI 自动生成专业绘图提示词 · Gemini/GPT双引擎</div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#a5b4fc', fontWeight: 600, marginBottom: '0.25rem' }}>✍️ 描述出图需求</div>
+                    <textarea
+                      value={aiRequirementText}
+                      onChange={(e) => setAiRequirementText(e.target.value)}
+                      placeholder={"例如：电商产品主图，白色智能保温杯，纯白背景，商业摄影风格..."}
+                      style={{ width: '100%', minHeight: '65px', maxHeight: '100px', background: '#12121e', border: '1px solid rgba(99,102,241,0.22)', borderRadius: '0.45rem', padding: '0.45rem', color: '#ddd', fontSize: '0.75rem', resize: 'vertical', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '0.4rem', lineHeight: 1.45 }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.55)'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.22)'}
+                    />
+                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                      <button onClick={() => handleTextToAIPrompt('gemini')} disabled={isGeneratingTextPrompt || !aiRequirementText.trim()} style={{ flex: 1, padding: '0.32rem 0.4rem', border: 'none', borderRadius: '0.45rem', background: isGeneratingTextPrompt && promptSource === 'gemini' ? '#374151' : 'linear-gradient(135deg, #4285f4, #3367d6)', color: 'white', fontSize: '0.72rem', fontWeight: 600, cursor: (isGeneratingTextPrompt || !aiRequirementText.trim()) ? 'not-allowed' : 'pointer', opacity: (isGeneratingTextPrompt || !aiRequirementText.trim()) ? 0.5 : 1 }}>
+                        {isGeneratingTextPrompt && promptSource === 'gemini' ? '⏳Gemini...' : '✨Gemini'}
+                      </button>
+                      <button onClick={() => handleTextToAIPrompt('gpt')} disabled={isGeneratingTextPrompt || !aiRequirementText.trim()} style={{ flex: 1, padding: '0.32rem 0.4rem', border: 'none', borderRadius: '0.45rem', background: isGeneratingTextPrompt && promptSource === 'gpt' ? '#374151' : 'linear-gradient(135deg, #10a37f, #0d8c6f)', color: 'white', fontSize: '0.72rem', fontWeight: 600, cursor: (isGeneratingTextPrompt || !aiRequirementText.trim()) ? 'not-allowed' : 'pointer', opacity: (isGeneratingTextPrompt || !aiRequirementText.trim()) ? 0.5 : 1 }}>
+                        {isGeneratingTextPrompt && promptSource === 'gpt' ? '⏳GPT...' : '🤖GPT'}
+                      </button>
+                    </div>
+
+                    {isGeneratingTextPrompt && (
+                      <div style={{ textAlign: 'center', padding: '0.6rem', color: '#a5b4fc', fontSize: '0.75rem', background: 'rgba(99,102,241,0.06)', borderRadius: '0.45rem', marginBottom: '0.3rem' }}>
+                        ⏳ AI 正在分析您的需求，正在撰写专业提示词...
+                      </div>
+                    )}
+
+                    {textPromptCards.length > 0 && !isGeneratingTextPrompt && (
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 600, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>✅ 提示词已生成</span>
+                          <button onClick={() => usePromptCard(textPromptCards[0].cn, textPromptCards[0].en)} style={{ padding: '0.18rem 0.45rem', border: 'none', borderRadius: '0.35rem', background: 'linear-gradient(135deg,#10b981,#059669)', color: 'white', cursor: 'pointer', fontSize: '0.62rem', fontWeight: 600 }}>📋 使用</button>
+                        </div>
+                        <div style={{ background: 'linear-gradient(135deg, #0c0c14, #14142a)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '0.45rem', padding: '0.4rem 0.5rem', marginBottom: '0.3rem' }}>
+                          <div style={{ fontSize: '0.62rem', color: '#10b981', fontWeight: 700, marginBottom: '0.15rem' }}>📝 中文</div>
+                          <div style={{ fontSize: '0.7rem', color: '#ddd', lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{textPromptCards[0].cn}</div>
+                        </div>
+                        <div style={{ background: 'linear-gradient(135deg, #0c0c14, #14142a)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '0.45rem', padding: '0.4rem 0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.15rem' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#3b82f6', fontWeight: 700 }}>🌐 EN</span>
+                            <button onClick={() => navigator.clipboard.writeText(textPromptCards[0].en)} style={{ padding: '0.1rem 0.3rem', border: 'none', borderRadius: '0.25rem', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', cursor: 'pointer', fontSize: '0.56rem' }}>复制</button>
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#ccc', lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{textPromptCards[0].en}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isGeneratingTextPrompt && textPromptCards.length === 0 && aiRequirementText.trim() === '' && (
+                      <div style={{ textAlign: 'center', padding: '0.4rem', fontSize: '0.62rem', color: '#444', fontStyle: 'italic' }}>↑ 描述需求，选AI引擎生成提示词</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+
               {/* Text Input Area */}
               <div style={{ flex: 1 }}>
                 <div className="text-input-area" style={{
@@ -1637,7 +1717,7 @@ not "a near-duplicate remake of the reference image."` },
         </div>
 
         {/* Column 2: 🤖 AI智能提示词 */}
-        <div className={`col-ai-prompt${mode !== "upload" ? " text-full-width" : ""}`}>
+        <div className={`col-ai-prompt${mode !== "upload" ? " text-mode-hide" : ""}`}>
 
           {/* ===== 🤖 AI智能提示词生成 — 独立模块 ===== */}
           <div style={{
