@@ -121,7 +121,7 @@ function saveGenerationLogs(logs: GenerationLog[]) {
   }
 }
 
-function estimateCost(usage: UsageMetadata | undefined, imageCount: number): number {
+function estimateCost(usage: UsageMetadata | null | undefined, imageCount: number): number {
   if (!usage) return 0
   const inputCost = (usage.promptTokenCount / 1_000_000) * 0.15
   const outputTextCost = (usage.candidatesTokenCount / 1_000_000) * 0.60
