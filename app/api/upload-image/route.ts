@@ -11,8 +11,11 @@ async function uploadImageHandler(request: NextRequest) {
       return NextResponse.json({ error: '请提供图片数据' }, { status: 400 })
     }
 
-    // ImgBB API配置
-    const apiKey = process.env.IMGBB_API_KEY || 'f4e662f6c1f44d6c8c8a2b8e8f9c0d1e' // 临时测试key
+    // ImgBB API配置 - 必须通过环境变量 IMGBB_API_KEY 配置
+    const apiKey = process.env.IMGBB_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: '图片上传服务未配置，请设置 IMGBB_API_KEY 环境变量' }, { status: 503 })
+    }
     const apiUrl = 'https://api.imgbb.com/1/upload'
 
     // 准备表单数据

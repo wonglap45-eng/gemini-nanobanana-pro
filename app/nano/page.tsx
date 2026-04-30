@@ -82,6 +82,70 @@ export default function NanoPage() {
   const [showQuotaModal, setShowQuotaModal] = useState(false)
   const [showApiConfig, setShowApiConfig] = useState(false)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => loadApiConfig())
+// ── 后台日志类型 ──
+interface UsageMetadata {
+  promptTokenCount: number
+  candidatesTokenCount: number
+  totalTokenCount: number
+}
+
+interface GenerationLog {
+  id: string
+  timestamp: number
+  prompt: string
+  model: string
+  requestedCount: number
+  successCount: number
+  errors?: string[]
+  images: Array<{ imageData: string; mimeType: string }>
+  usageMetadata?: UsageMetadata
+  estimatedCost: number
+}
+
+const STORAGE_KEY = 'nano-generation-logs'
+const MAX_LOGS = 50
+
+function loadGenerationLogs(): GenerationLog[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveGenerationLogs(logs: GenerationLog[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs))
+  } catch (e) {
+    console.warn('保存日志失败（可能 localStorage 已满）:', e)
+  }
+}
+
+function estimateCost(usage: UsageMetadata | undefined, imageCount: number): number {
+  if (!usage) return 0
+  const inputCost = (usage.promptTokenCount / 1_000_000) * 0.15
+  const outputTextCost = (usage.candidatesTokenCount / 1_000_000) * 0.60
+  const imageCost = imageCount * 0.04
+  return inputCost + outputTextCost + imageCost
+}
+
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+}
+
+function truncatePrompt(text: string, maxLen = 60): string {
+  return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
+}
+
+  const [generationLogs, setGenerationLogs] = useState<GenerationLog[]>(() => loadGenerationLogs())
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
+
 
   // 下载按钮统一样式
   const downloadBtnStyle = {
@@ -547,7 +611,11 @@ not "a near-duplicate remake of the reference image."` },
     setPromptSource('preset')
   }
 
-  const handleGenerate = async () => {
+  
+  // ── 后台日志：记录最近一次生成的 usage metadata ──
+  const lastUsageRef = useRef<UsageMetadata | null>(null)
+
+const handleGenerate = async () => {
     // 调试：显示当前配置
     console.log('🔍 当前 API 配置:', apiConfig)
 
@@ -615,6 +683,11 @@ not "a near-duplicate remake of the reference image."` },
           })
 
           const data = await response.json()
+
+          // 捕获 usageMetadata 用于后台日志
+          if (data.usageMetadata) {
+            lastUsageRef.current = data.usageMetadata
+          }
 
           if (!response.ok) {
             const errMsg = data.error || `HTTP ${response.status}`
@@ -691,6 +764,45 @@ not "a near-duplicate remake of the reference image."` },
     } finally {
       setGenerateProgress(null)
       setLoading(false)
+    }
+
+    // 写入生成日志到后台
+    try {
+      const finalPrompt = prompt // 从闭包捕获
+      const modelName = result?.model || 'gemini-2.5-flash-image'
+      const successCount = allImages.length
+      
+      // 只存缩略版图片（base64 前 200 字符，足够展示缩略图）
+      const thumbImages = allImages.map(img => ({
+        imageData: img.imageData.substring(0, 200),
+        mimeType: img.mimeType
+      }))
+
+      // 从最终 response 中获取 usageMetadata
+      // 注意：最后一张请求的 data 中有 usageMetadata，但这里通过闭包不可达
+      // 所以从最后一次 fetch 的结果中获取
+      // 实际上我们在循环中已经处理过了，但 finalResponse 在循环外不可用
+      // 所以先设为 null，由后续 setResult 逻辑补充
+      
+      const logEntry: GenerationLog = {
+        id: `gen_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        timestamp: Date.now(),
+        prompt: finalPrompt,
+        model: modelName,
+        requestedCount: generateCount,
+        successCount,
+        images: thumbImages,
+        errors: errors.length > 0 ? errors : undefined,
+        estimatedCost: estimateCost(lastUsageRef.current, allImages.length),
+      }
+
+      setGenerationLogs(prev => {
+        const updated = [logEntry, ...prev].slice(0, MAX_LOGS)
+        saveGenerationLogs(updated)
+        return updated
+      })
+    } catch (logErr) {
+      console.error('写入生成日志失败:', logErr)
     }
   }
 
@@ -3061,9 +3173,257 @@ not "a near-duplicate remake of the reference image."` },
           </div>
         </div>
       )}
+
+      {/* ── 后台侧边栏 ── */}
+      {/* 触发按钮（右侧边缘竖条） */}
+      <div
+        onClick={() => setShowAdminPanel(!showAdminPanel)}
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '28px',
+          height: '120px',
+          background: 'linear-gradient(180deg, #10b981, #059669)',
+          borderRadius: '6px 0 0 6px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999,
+          boxShadow: showAdminPanel ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none',
+          transition: 'all 0.3s ease',
+          writingMode: 'vertical-rl',
+          fontSize: '0.75rem',
+          color: '#fff',
+          fontWeight: 'bold',
+          letterSpacing: '2px',
+          userSelect: 'none'
+        }}
+      >
+        后台
+      </div>
+
+      {/* 侧边栏面板 */}
+      <div style={{
+        position: 'fixed',
+        right: showAdminPanel ? 0 : '-340px',
+        top: 0,
+        width: '330px',
+        height: '100vh',
+        background: 'linear-gradient(180deg, #0c0c14, #14142a)',
+        borderLeft: '1px solid rgba(16, 185, 129, 0.2)',
+        zIndex: 1000,
+        transition: 'right 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: showAdminPanel ? '-4px 0 24px rgba(0,0,0,0.5)' : 'none'
+      }}>
+        {/* 标题栏 */}
+        <div style={{
+          padding: '1rem 1.2rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'rgba(16, 185, 129, 0.05)'
+        }}>
+          <span style={{ color: '#10b981', fontSize: '0.95rem', fontWeight: 'bold' }}>
+            📊 生图后台
+          </span>
+          <button
+            onClick={() => setShowAdminPanel(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#888',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              padding: '0.2rem 0.5rem'
+            }}
+          >✕</button>
+        </div>
+
+        {/* 统计概览 */}
+        <div style={{
+          padding: '0.8rem 1.2rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '0.5rem'
+        }}>
+          {(() => {
+            const total = generationLogs.length
+            const totalImages = generationLogs.reduce((s, l) => s + l.successCount, 0)
+            const totalCost = generationLogs.reduce((s, l) => s + l.estimatedCost, 0)
+            const successRate = total > 0 ? Math.round((generationLogs.filter(l => l.successCount > 0).length / total) * 100) : 0
+            return <>
+              <StatBox label="总生图" value={`${total} 次`} color="#10b981" />
+              <StatBox label="总图片" value={`${totalImages} 张`} color="#3b82f6" />
+              <StatBox label="总花费" value={`~$${totalCost.toFixed(4)}`} color="#f59e0b" />
+              <StatBox label="成功率" value={`${successRate}%`} color={successRate >= 80 ? '#10b981' : '#ef4444'} />
+            </>
+          })()}
+        </div>
+
+        {/* 历史列表 */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '0.5rem'
+        }}>
+          {generationLogs.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              color: '#555',
+              fontSize: '0.8rem',
+              padding: '2rem 0'
+            }}>
+              暂无生图记录
+            </div>
+          ) : (
+            generationLogs.map(log => (
+              <div key={log.id} style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '0.5rem',
+                padding: '0.6rem',
+                marginBottom: '0.5rem',
+                transition: 'all 0.2s ease'
+              }}>
+                {/* 顶部：时间 + 状态 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.3rem'
+                }}>
+                  <span style={{ color: '#666', fontSize: '0.65rem' }}>
+                    {formatTimestamp(log.timestamp)}
+                  </span>
+                  <span style={{
+                    fontSize: '0.6rem',
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '0.3rem',
+                    fontWeight: 'bold',
+                    backgroundColor: log.errors?.length
+                      ? (log.successCount > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)')
+                      : 'rgba(16, 185, 129, 0.15)',
+                    color: log.errors?.length
+                      ? (log.successCount > 0 ? '#f59e0b' : '#ef4444')
+                      : '#10b981'
+                  }}>
+                    {log.errors?.length
+                      ? (log.successCount > 0 ? `部分成功 ${log.successCount}/${log.requestedCount}` : '失败')
+                      : `成功 ${log.successCount} 张`}
+                  </span>
+                </div>
+
+                {/* 提示词 */}
+                <div style={{
+                  color: '#aaa',
+                  fontSize: '0.65rem',
+                  marginBottom: '0.3rem',
+                  lineHeight: 1.4,
+                  cursor: 'pointer'
+                }}
+                  title={log.prompt}
+                >
+                  {truncatePrompt(log.prompt)}
+                </div>
+
+                {/* 底部：模型 + 花费 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: '#555', fontSize: '0.6rem' }}>
+                    {log.model} × {log.requestedCount}
+                  </span>
+                  <span style={{ color: '#f59e0b', fontSize: '0.65rem' }}>
+                    ~${log.estimatedCost.toFixed(4)}
+                  </span>
+                </div>
+
+                {/* 缩略图行 */}
+                {log.images.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.3rem',
+                    marginTop: '0.4rem',
+                    overflow: 'hidden'
+                  }}>
+                    {log.images.map((img, i) => (
+                      <img
+                        key={i}
+                        src={`data:${img.mimeType};base64,${img.imageData}`}
+                        alt={`thumb-${i}`}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '0.3rem',
+                          objectFit: 'cover',
+                          border: '1px solid rgba(255,255,255,0.05)'
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 底部：清空按钮 */}
+        {generationLogs.length > 0 && (
+          <div style={{
+            padding: '0.5rem 1.2rem',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            textAlign: 'center'
+          }}>
+            <button
+              onClick={() => {
+                if (confirm('确定清空所有生图记录？')) {
+                  setGenerationLogs([])
+                  saveGenerationLogs([])
+                }
+              }}
+              style={{
+                background: 'none',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.4rem',
+                color: '#ef4444',
+                fontSize: '0.7rem',
+                padding: '0.3rem 1rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+            >
+              清空全部记录
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+
+const StatBox = ({ label, value, color }: { label: string; value: string; color: string }) => (
+  <div style={{
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '0.4rem',
+    padding: '0.5rem'
+  }}>
+    <div style={{ color: '#666', fontSize: '0.6rem', marginBottom: '0.15rem' }}>{label}</div>
+    <div style={{ color, fontSize: '0.85rem', fontWeight: 'bold' }}>{value}</div>
+  </div>
+)
 
 const tagStyle: React.CSSProperties = {
   padding: '0.25rem 0.75rem',

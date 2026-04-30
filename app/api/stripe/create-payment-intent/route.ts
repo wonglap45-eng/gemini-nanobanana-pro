@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe, getPlan, isValidPlanId } from '../server-config'
+import { stripe, isStripeEnabled, getPlan, isValidPlanId } from '../server-config'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
+    // 检查 Stripe 是否已配置
+    if (!isStripeEnabled || !stripe) {
+      return NextResponse.json({ 
+        error: '支付功能未启用' 
+      }, { status: 503 })
+    }
+
     const { planId, customerEmail, customerName } = await request.json()
     
     // 验证必要参数

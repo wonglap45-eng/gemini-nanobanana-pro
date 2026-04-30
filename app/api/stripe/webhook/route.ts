@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '../server-config'
+import { stripe, isStripeEnabled } from '../server-config'
 import { headers } from 'next/headers'
 import { addUserCredits } from '../../../lib/credits'
 
@@ -7,15 +7,19 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
+    // Stripe 未配置时直接返回成功（不处理）
+    if (!isStripeEnabled || !stripe) {
+      return NextResponse.json({ error: '支付功能未启用' }, { status: 503 })
+    }
     const body = await request.text()
     const headersList = headers()
     const signature = headersList.get('stripe-signature')
 
     let event
 
-    // 本地测试环境跳过签名验证
-    if (!process.env.STRIPE_WEBHOOK_SECRET || process.env.NODE_ENV === 'development') {
-      console.log('本地测试模式：跳过webhook签名验证')
+    // 生产环境必须验证签名，开发环境也建议配置
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.warn('⚠️ STRIPE_WEBHOOK_SECRET 未配置，Webhook处于不安全模式！生产环境必须配置。')
       try {
         event = JSON.parse(body)
       } catch (err) {
@@ -23,7 +27,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '数据格式错误' }, { status: 400 })
       }
     } else {
-      // 生产环境验证签名
+      // 始终验证签名（无论环境）
       if (!signature) {
         console.error('缺少Stripe签名')
         return NextResponse.json({ error: '缺少签名' }, { status: 400 })

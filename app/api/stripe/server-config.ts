@@ -2,18 +2,24 @@ import Stripe from 'stripe'
 import { PRICING_PLANS, getPlan, isValidPlanId } from '../../lib/pricing-plans'
 export type { PlanId } from '../../lib/pricing-plans'
 
-// 服务器端Stripe配置
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('❌ STRIPE_SECRET_KEY 环境变量未配置！请在 .env.local 中添加你的Stripe密钥')
-}
+// 服务器端Stripe配置 - 可选，不配置则禁用支付功能
+const hasStripeKey = !!process.env.STRIPE_SECRET_KEY
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-  typescript: true,
-})
+export const stripe = hasStripeKey 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2023-10-16',
+      typescript: true,
+    })
+  : null as unknown as Stripe
 
+export const isStripeEnabled = hasStripeKey
 export const isTestMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_') || false
-console.log(`🔧 Stripe模式: ${isTestMode ? '测试环境' : '生产环境'}`)
+
+if (hasStripeKey) {
+  console.log(`🔧 Stripe模式: ${isTestMode ? '测试环境' : '生产环境'}`)
+} else {
+  console.log('⚠️ Stripe未配置，支付功能已禁用')
+}
 
 // 导出定价计划相关功能
 export { PRICING_PLANS, getPlan, isValidPlanId }

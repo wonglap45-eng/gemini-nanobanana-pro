@@ -11,7 +11,7 @@ export const translations = {
 
     // Mode Selector
     mode: {
-      upload: '📷 通过对话编辑图像',
+      upload: '📷 图生图',
       text: '✨ 文生图模式'
     },
 
@@ -213,7 +213,7 @@ export const translations = {
 
     // Mode Selector
     mode: {
-      upload: '📷 Edit Images via Conversation',
+      upload: '📷 Image-to-Image',
       text: '✨ Text-to-Image Mode'
     },
 

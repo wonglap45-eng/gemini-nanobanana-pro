@@ -1,6 +1,6 @@
 /**
- * 简化的 API 配置系统
- * 只用于配置中转 API
+ * API 配置系统
+ * 用于前端管理用户自定义 API 配置（localStorage 持久化）
  */
 
 export interface ApiConfig {
@@ -8,7 +8,7 @@ export interface ApiConfig {
   geminiApiKey: string;
   geminiApiUrl: string;
 
-  // Doubao API 配置
+  // Doubao API 配置（可选）
   doubaoApiKey: string;
   doubaoApiUrl: string;
 }
@@ -16,14 +16,14 @@ export interface ApiConfig {
 const STORAGE_KEY = 'nanobanana_api_config';
 
 /**
- * 获取默认 API 配置
+ * 获取默认 API 配置 - 默认使用 Google 官方 Gemini API
  */
 export function getDefaultApiConfig(): ApiConfig {
   return {
     geminiApiKey: '',
-    geminiApiUrl: 'https://apipro.maynor1024.live',
+    geminiApiUrl: 'https://generativelanguage.googleapis.com',
     doubaoApiKey: '',
-    doubaoApiUrl: 'https://apipro.maynor1024.live',
+    doubaoApiUrl: '',
   };
 }
 

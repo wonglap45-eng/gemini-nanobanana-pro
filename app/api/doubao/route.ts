@@ -11,9 +11,9 @@ async function doubaoHandler(request: NextRequest) {
       return NextResponse.json({ error: '请提供描述' }, { status: 400 })
     }
 
-    // 优先使用前端传来的自定义配置，否则使用环境变量
-    const apiKey = customApiKey || process.env.MAYNOR_API_KEY
-    const apiUrl = customApiUrl || process.env.MAYNOR_API_URL || 'https://apipro.maynor1024.live'
+    // 豆包/Doubao API - 必须通过环境变量或前端传入配置，无默认值
+    const apiKey = customApiKey || process.env.DOUBAO_API_KEY
+    const apiUrl = customApiUrl || process.env.DOUBAO_API_URL
 
     if (!apiKey) {
       return NextResponse.json({ error: 'Doubao API配置缺失，请在页面右上角配置 API 密钥' }, { status: 500 })

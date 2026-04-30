@@ -1,0 +1,1643 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import './nano.css'
+import BrowserWarning from '../components/BrowserWarning'
+import { useLanguage } from '../i18n/LanguageContext'
+import ShareModal from '../components/ShareModal'
+import FreeQuotaModal from '../components/FreeQuotaModal'
+import { loadApiConfig, saveApiConfig, type ApiConfig } from '../lib/api-config'
+
+type Mode = 'upload' | 'text'
+type Style = 'none' | 'enhance' | 'artistic' | 'anime' | 'photo'
+
+export default function NanoPage() {
+  const { language, setLanguage, t } = useLanguage()
+  const [mode, setMode] = useState<Mode>('text')
+  const [prompt, setPrompt] = useState('')
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [style, setStyle] = useState<Style>('none')
+  const [imageSize, setImageSize] = useState<string>('1k')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string>('')
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorModalTitle, setErrorModalTitle] = useState('')
+  const [errorModalMessage, setErrorModalMessage] = useState('')
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showQuotaModal, setShowQuotaModal] = useState(false)
+  const [showApiConfig, setShowApiConfig] = useState(false)
+  const [apiConfig, setApiConfig] = useState<ApiConfig>(() => loadApiConfig())
+
+  const quickPrompts = [
+    { icon: '🏔️', text: '风景', value: '美丽的自然风景' },
+    { icon: '👥', text: '人像', value: '专业人像摄影' },
+    { icon: '🏛️', text: '建筑', value: '现代建筑设计' },
+    { icon: '🎨', text: '艺术', value: '抽象艺术作品' },
+    { icon: '🚀', text: '科幻', value: '科幻场景' },
+    { icon: '🌿', text: '自然', value: '自然生态' },
+    { icon: '🐾', text: '动物', value: '可爱的动物' },
+    { icon: '💡', text: '创意', value: '创意设计' }
+  ]
+
+  // 图像编辑专用快速操作
+  const editingQuickPrompts = [
+    { icon: '📦', text: '基本要求', value: '生成与提供的图片相似的图片\n\n但是图片，结构，排版，绝对不能和参考图一模一样，图片应该从清晰、高质量的角度展示产品，满足以下要求：\n\n标签应清晰可见并且易于阅读。\n瓶子的设计应专业、简洁，适合用于亚马逊主图。\n背景一定要为纯白色或中性色，以突出产品。\n瓶子应居中对焦，周围没有分散注意力的元素。' },
+    { icon: '✨', text: '智能美化', value: '智能美化图片，增强细节，提高画质，保持原有风格和色调' },
+    { icon: '🎭', text: '风格转换', value: '将图片转换为艺术风格，如油画、水彩或素描效果，保持主要内容不变' },
+    { icon: '🐛', text: '添加元素', value: '请为这张图片添加一个可爱的小动物在合适的位置，保持原图的风格和色调' },
+    { icon: '🌈', text: '色彩优化', value: '优化图片色彩饱和度和对比度，使画面更加生动明亮' },
+    { icon: '🌅', text: '光影增强', value: '优化图片的光影效果，增强层次感和立体感，使画面更有深度' },
+    { icon: '🔧', text: '智能修复', value: '修复图片中的瑕疵和噪点，优化整体视觉效果' },
+    { icon: '👗', text: '穿搭分析', value: '分析图片中的服装搭配，在原图基础上添加标注和建议' },
+    { icon: '🔍', text: '详细分析', value: '在原图基础上添加详细的标注说明，分析图片内容和关键元素' }
+  ]
+
+  // 页面加载时检查是否需要显示额度耗尽弹窗（首次访问）
+  useEffect(() => {
+    const hasSeenQuotaModal = localStorage.getItem('hasSeenQuotaModal')
+    if (!hasSeenQuotaModal) {
+      // 延迟1秒后显示，让页面先加载
+      const timer = setTimeout(() => {
+        setShowQuotaModal(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  // 关闭额度弹窗并记录到 localStorage
+  const handleCloseQuotaModal = () => {
+    setShowQuotaModal(false)
+    localStorage.setItem('hasSeenQuotaModal', 'true')
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      // 检查是否超过最大限制（最多10张图片）
+      const totalFiles = [...imageFiles, ...files]
+      if (totalFiles.length > 10) {
+        alert('最多只能上传10张图片')
+        // 重置input值以允许重新选择相同的文件
+        e.target.value = ''
+        return
+      }
+
+      setIsUploading(true)
+
+      try {
+        // 同步更新文件列表
+        const newImageFiles = [...imageFiles, ...files]
+        
+        // 批量处理所有文件的预览
+        const previewPromises = files.map(file => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              resolve(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+          })
+        })
+
+        // 等待所有预览完成后一次性更新状态
+        const newPreviews = await Promise.all(previewPromises)
+        
+        // 确保状态同步更新
+        setImageFiles(newImageFiles)
+        setImagePreviews(prev => [...prev, ...newPreviews])
+        
+        console.log('图片上传完成:', { 
+          newFilesCount: files.length, 
+          totalFiles: newImageFiles.length,
+          totalPreviews: imagePreviews.length + newPreviews.length
+        })
+      } catch (error) {
+        console.error('图片上传失败:', error)
+        showError('上传失败', '图片上传失败，请重试')
+      } finally {
+        setIsUploading(false)
+      }
+    }
+
+    // 重置input值以允许重新选择相同的文件
+    e.target.value = ''
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'))
+    if (files.length > 0) {
+      // 检查是否超过最大限制（最多10张图片）
+      const totalFiles = [...imageFiles, ...files]
+      if (totalFiles.length > 10) {
+        alert('最多只能上传10张图片')
+        return
+      }
+
+      setIsUploading(true)
+
+      try {
+        // 同步更新文件列表
+        const newImageFiles = [...imageFiles, ...files]
+        
+        // 批量处理所有文件的预览
+        const previewPromises = files.map(file => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              resolve(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+          })
+        })
+
+        // 等待所有预览完成后一次性更新状态
+        const newPreviews = await Promise.all(previewPromises)
+        
+        // 确保状态同步更新
+        setImageFiles(newImageFiles)
+        setImagePreviews(prev => [...prev, ...newPreviews])
+        
+        console.log('拖拽上传完成:', { 
+          newFilesCount: files.length, 
+          totalFiles: newImageFiles.length,
+          totalPreviews: imagePreviews.length + newPreviews.length
+        })
+      } catch (error) {
+        console.error('拖拽上传失败:', error)
+        showError('上传失败', '图片上传失败，请重试')
+      } finally {
+        setIsUploading(false)
+      }
+    } else {
+      showError('文件类型错误', '请上传图片文件')
+    }
+  }
+
+  const compressImage = (file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.8): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      
+      img.onload = () => {
+        const { width, height } = img
+        const ratio = Math.min(maxWidth / width, maxHeight / height)
+        
+        canvas.width = width * ratio
+        canvas.height = height * ratio
+        
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            })
+            resolve(compressedFile)
+          } else {
+            resolve(file)
+          }
+        }, 'image/jpeg', quality)
+      }
+      
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  const convertToBase64 = async (file: File): Promise<string> => {
+    // Compress large images first
+    const maxSizeMB = 2
+    let processedFile = file
+
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      processedFile = await compressImage(file)
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(processedFile)
+      reader.onload = () => {
+        const base64 = reader.result as string
+        const base64Data = base64.split(',')[1]
+        resolve(base64Data)
+      }
+      reader.onerror = error => reject(error)
+    })
+  }
+
+  const convertMultipleToBase64 = async (files: File[]): Promise<string[]> => {
+    const promises = files.map(file => convertToBase64(file))
+    return Promise.all(promises)
+  }
+
+  // 显示错误弹窗的函数
+  const showError = (title: string, message: string) => {
+    setErrorModalTitle(title)
+    setErrorModalMessage(message)
+    setShowErrorModal(true)
+  }
+
+  const handleGenerate = async () => {
+    // 调试：显示当前配置
+    console.log('🔍 当前 API 配置:', apiConfig)
+
+    if (mode === 'text' && prompt.length < 3) {
+      showError('输入提示', '请输入至少3个字符的描述')
+      return
+    }
+    if (mode === 'upload' && imageFiles.length === 0) {
+      showError('上传提示', '请先上传图片')
+      return
+    }
+
+    if (isUploading) {
+      showError('上传提示', '图片正在上传中，请稍候...')
+      return
+    }
+
+    setLoading(true)
+    setResult(null)
+    setError('')
+
+    try {
+      let imageDataArray = null
+      let finalPrompt = prompt
+
+      if (mode === 'upload' && imageFiles.length > 0) {
+        imageDataArray = await convertMultipleToBase64(imageFiles)
+        const stylePrompt = getStylePrompt(style)
+        const imageCountText = imageFiles.length > 1 ? `基于${imageFiles.length}张图片` : '基于上传的图片'
+        finalPrompt = stylePrompt ? `${stylePrompt} ${imageCountText} ${prompt || '优化这些图片'}` : (prompt || '优化这些图片')
+      } else {
+        // 文生图模式不需要图片数据
+        imageDataArray = null
+        const stylePrompt = getStylePrompt(style)
+        finalPrompt = stylePrompt ? `${stylePrompt} ${prompt}` : prompt
+      }
+
+      // 统一使用 /api/gemini 端点
+      const apiEndpoint = '/api/gemini'
+
+      const requestBody = mode === 'text'
+        ? { prompt: finalPrompt }
+        : { prompt: finalPrompt, imageDataArray }
+
+      // 添加用户标识到请求
+      const requestData: any = {
+        ...requestBody
+      }
+
+      // 使用时间戳作为用户标识
+      requestData.timestamp = Date.now()
+
+      // 传递用户自定义 API 配置（后端会 fallback 到环境变量）
+      if (apiConfig.geminiApiKey) {
+        requestData.apiKey = apiConfig.geminiApiKey
+      }
+      if (apiConfig.geminiApiUrl) {
+        requestData.apiUrl = apiConfig.geminiApiUrl
+      }
+
+      console.log('发送请求到:', apiEndpoint, '配置:', {
+        hasApiKey: !!requestData.apiKey,
+        apiUrl: requestData.apiUrl
+      })
+
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      })
+
+      let data
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        console.error('JSON解析错误:', parseError)
+        showError('API解析错误', `API响应解析失败，请稍后重试。`)
+        return
+      }
+
+      if (!response.ok) {
+        // 检查是否是额度不足错误
+        if (response.status === 429 ||
+            (data.error && (
+              data.error.includes('额度') ||
+              data.error.includes('quota') ||
+              data.error.includes('limit') ||
+              data.error.includes('insufficient')
+            ))) {
+          setShowQuotaModal(true)
+          return
+        }
+
+        if (response.status === 524) {
+          const errorMsg = `服务器响应超时，请稍后重试。`
+          showError('服务器超时', errorMsg)
+          return
+        } else if (response.status === 500) {
+          const errorMsg = `服务器内部错误：${data.error || '未知错误'}`
+          showError('服务器错误', errorMsg)
+          return
+        }
+        const errorMsg = `生成失败：${data.error || '未知错误'}`
+        showError('生成失败', errorMsg)
+        return
+      } else {
+        setResult(data)
+      }
+    } catch (err) {
+      console.error('请求错误:', err)
+      if (err instanceof Error) {
+        if (err.message.includes('fetch')) {
+          showError('网络错误', `网络连接失败，请检查网络后重试。`)
+        } else if (err.message.includes('timeout')) {
+          showError('请求超时', `请求超时，请稍后重试。`)
+        } else {
+          showError('发生错误', `发生错误：${err.message}`)
+        }
+      } else {
+        showError('未知错误', '未知错误，请重试。')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStylePrompt = (style: Style): string => {
+    const styles = {
+      none: '',
+      enhance: '增强细节，提高画质',
+      artistic: '艺术风格，油画效果',
+      anime: '动漫风格，二次元',
+      photo: '写实照片，真实感'
+    }
+    return styles[style]
+  }
+
+  // 下载图片
+  const downloadImage = (imageData: string, mimeType: string = 'image/png') => {
+    const link = document.createElement('a')
+    link.href = `data:${mimeType};base64,${imageData}`
+    link.download = `generated-${Date.now()}.${mimeType.split('/')[1]}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // 分享图片
+  const shareImage = async (imageData: string, mimeType: string = 'image/png') => {
+    if (navigator.share && navigator.canShare) {
+      try {
+        const blob = await (await fetch(`data:${mimeType};base64,${imageData}`)).blob()
+        const file = new File([blob], `generated-${Date.now()}.${mimeType.split('/')[1]}`, { type: mimeType })
+        
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'AI生成的图片',
+            text: '查看这张AI生成的图片'
+          })
+        }
+      } catch (error) {
+        console.error('分享失败:', error)
+        // 降级到复制链接
+        copyToClipboard(`data:${mimeType};base64,${imageData}`)
+      }
+    } else {
+      // 降级到复制链接
+      copyToClipboard(`data:${mimeType};base64,${imageData}`)
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      showError('提示', '图片链接已复制到剪贴板')
+    }).catch(() => {
+      showError('提示', '复制失败，请手动复制')
+    })
+  }
+
+  return (
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#0a0a0a',
+      color: '#ffffff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      {/* 浏览器兼容性警告 */}
+      <BrowserWarning />
+      {/* Header */}
+      <header style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem 2rem',
+        borderBottom: '1px solid #1a1a1a'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '0.5rem',
+          width: '100%',
+          justifyContent: 'center'
+        }}>
+            <h1 style={{
+            fontSize: '2.5rem',
+            fontWeight: 'bold',
+            background: 'linear-gradient(135deg, #10b981, #00a3ff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            图图来了
+          </h1>
+        </div>
+
+      </header>
+
+      {/* Mode Selector */}
+      <div className="mode-selector" style={{ display: 'flex', gap: '1rem', padding: '2rem', justifyContent: 'center' }}>
+        <button
+          className="mode-button"
+          onClick={() => setMode('upload')}
+          style={{
+            flex: 1,
+            maxWidth: '400px',
+            padding: '1rem 2rem',
+            background: mode === 'upload'
+              ? 'linear-gradient(135deg, #10b981, #059669)'
+              : 'transparent',
+            border: mode === 'upload' ? 'none' : '1px solid #10b981',
+            color: mode === 'upload' ? 'white' : '#10b981',
+            borderRadius: '0.75rem',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'all 0.3s ease',
+            boxShadow: mode === 'upload'
+              ? '0 8px 25px rgba(16, 185, 129, 0.3)'
+              : 'none',
+            transform: mode === 'upload' ? 'translateY(-2px)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (mode !== 'upload') {
+              e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.2)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (mode !== 'upload') {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.transform = 'none'
+              e.currentTarget.style.boxShadow = 'none'
+            }
+          }}
+        >
+          {t.mode.upload}
+        </button>
+        <button
+          className="mode-button"
+          onClick={() => setMode('text')}
+          style={{
+            flex: 1,
+            maxWidth: '400px',
+            padding: '1rem 2rem',
+            background: mode === 'text'
+              ? 'linear-gradient(135deg, #10b981, #059669)'
+              : 'transparent',
+            border: mode === 'text' ? 'none' : '1px solid #10b981',
+            color: mode === 'text' ? 'white' : '#10b981',
+            borderRadius: '0.75rem',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'all 0.3s ease',
+            boxShadow: mode === 'text'
+              ? '0 8px 25px rgba(16, 185, 129, 0.3)'
+              : 'none',
+            transform: mode === 'text' ? 'translateY(-2px)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (mode !== 'text') {
+              e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.2)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (mode !== 'text') {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.transform = 'none'
+              e.currentTarget.style.boxShadow = 'none'
+            }
+          }}
+        >
+          {t.mode.text}
+        </button>
+      </div>
+
+
+
+      {/* Main Content */}
+      <div className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 2rem 2rem', maxWidth: '1400px', margin: '0 auto' }}>
+        {/* 输入区域 - 左右布局 */}
+        <div style={{ display: 'flex', gap: '2rem' }}>
+        {/* Left Panel */}
+        <div className="left-panel" style={{ flex: 1 }}>
+          {mode === 'upload' ? (
+            <div
+              className="upload-area"
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              style={{
+                background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+                border: '2px dashed rgba(16, 185, 129, 0.3)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                textAlign: 'center',
+                minHeight: '500px',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                if (imagePreviews.length === 0) {
+                  document.getElementById('file-upload')?.click()
+                }
+              }}
+            >
+              {isUploading ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📤</div>
+                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', color: '#10b981' }}>
+                    正在上传图片...
+                  </h3>
+                  <p style={{ color: '#888' }}>请稍候，正在处理您的图片</p>
+                </div>
+              ) : imagePreviews.length > 0 ? (
+                <div>
+                  <div className="image-grid" style={{
+                    display: 'grid',
+                    gridTemplateColumns: imagePreviews.length === 1 ? '1fr' : imagePreviews.length === 2 ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1rem',
+                    maxHeight: '300px',
+                    overflowY: 'auto'
+                  }}>
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} style={{ position: 'relative' }}>
+                        <img
+                          className="image-preview"
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '120px',
+                            objectFit: 'cover',
+                            borderRadius: '0.5rem',
+                            border: '2px solid #10b981'
+                          }}
+                        />
+                        <button
+                          className="close-button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const newFiles = imageFiles.filter((_, i) => i !== index)
+                            const newPreviews = imagePreviews.filter((_, i) => i !== index)
+                            setImageFiles(newFiles)
+                            setImagePreviews(newPreviews)
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '-5px',
+                            right: '-5px',
+                            width: '24px',
+                            height: '24px',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          ×
+                        </button>
+                        <div className="image-number" style={{
+                          position: 'absolute',
+                          bottom: '5px',
+                          left: '5px',
+                          backgroundColor: 'rgba(0,0,0,0.7)',
+                          color: 'white',
+                          padding: '2px 6px',
+                          borderRadius: '0.25rem',
+                          fontSize: '12px'
+                        }}>
+                          {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="action-buttons" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+                    <label
+                      className="action-button"
+                      htmlFor="file-upload"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: 'white',
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        display: 'inline-block',
+                        boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)',
+                        transition: 'all 0.3s ease',
+                        fontSize: '0.9rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none'
+                        e.currentTarget.style.boxShadow = '0 2px 10px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      ➕ 添加更多图片
+                    </label>
+                    <button
+                      className="action-button"
+                      onClick={() => {
+                        setImageFiles([])
+                        setImagePreviews([])
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      🗑️ 清空全部
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '3rem', color: '#10b981', marginBottom: '1rem' }}>📸</div>
+                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', color: '#10b981' }}>拖拽图片到此处或点击上传</h3>
+                  <p style={{ color: '#888', marginBottom: '1rem', lineHeight: '1.5' }}>
+                    💡 支持多图上传，最多10张<br />
+                    📏 单个文件最大 10MB<br />
+                    🎨 支持 PNG, JPG, JPEG, WebP, GIF 格式<br />
+                    🔄 上传后可通过对话描述编辑需求
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    style={{ display: 'none' }}
+                    id="file-upload"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    style={{
+                      padding: '0.75rem 2rem',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: 'white',
+                      borderRadius: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-block',
+                      boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'none'
+                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)'
+                    }}
+                  >
+                    📁 选择图片文件
+                  </label>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '2rem' }}>
+              {/* Quick Prompts */}
+              <div style={{
+                background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+                borderRadius: '1.5rem',
+                padding: '1.5rem',
+                minWidth: '200px',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(16, 185, 129, 0.1)'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.1rem', 
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  ⚡ 灵感启发
+                </h3>
+                <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  点击下方标签快速开始创作
+                </p>
+                <div className="quick-prompts-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  {quickPrompts.map((item, index) => (
+                    <button
+                      className="quick-prompt-button"
+                      key={index}
+                      onClick={() => setPrompt(item.value)}
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #333',
+                        borderRadius: '0.75rem',
+                        color: '#888',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#10b981'
+                        e.currentTarget.style.color = '#10b981'
+                        e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.05)'
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#333'
+                        e.currentTarget.style.color = '#888'
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.transform = 'none'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.text}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Text Input Area */}
+              <div style={{ flex: 1 }}>
+                <div className="text-input-area" style={{
+                  background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+                  borderRadius: '1.5rem',
+                  padding: '1.5rem',
+                  minHeight: '500px',
+                  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(16, 185, 129, 0.1)'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '1.1rem', 
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    AI 图像生成
+                  </h3>
+                  <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#888' }}>
+                    描述你想要生成的图像
+                  </h4>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="例如: 一只可爱的卡通猫咪，坐在彩虹上，梦幻风格，柔和的色彩..."
+                    style={{
+                      width: '100%',
+                      minHeight: '350px',
+                      background: 'linear-gradient(135deg, #1a1a1a, #222222)',
+                      border: '1px solid #333',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      color: 'white',
+                      fontSize: '1rem',
+                      resize: 'vertical',
+                      transition: 'all 0.3s ease',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#10b981'
+                      e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.2)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#333'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                  <div style={{ 
+                    marginTop: '0.5rem', 
+                    textAlign: 'right',
+                    color: '#666',
+                    fontSize: '0.9rem'
+                  }}>
+                    {prompt.length}/5000
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        {/* 生成结果 - 直接在左侧上传框下方 */}
+        {result && (
+        <div style={{
+          marginTop: '1rem',
+          background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+          borderRadius: '1.5rem',
+          padding: '1.5rem',
+          border: '1px solid rgba(16, 185, 129, 0.15)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+            <h3 style={{
+              fontSize: '1.1rem',
+              background: 'linear-gradient(135deg, #10b981, #00d4ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+            ✨ 生成结果
+          </h3>
+          </div>
+
+          {result.imageData || result.imageUrl ? (
+            <div style={{ textAlign: 'center' }}>
+              <img
+                id="generated-image"
+                className="result-image"
+                src={result.imageUrl || `data:${result.mimeType};base64,${result.imageData}`}
+                alt="Generated"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '500px',
+                  borderRadius: '1rem',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
+                }}
+              />
+              <div style={{
+                marginTop: '0.8rem',
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => {
+                    const img = document.getElementById('generated-image') as HTMLImageElement
+                    if (img) {
+                      const canvas = document.createElement('canvas')
+                      const ctx = canvas.getContext('2d')
+                      canvas.width = img.naturalWidth
+                      canvas.height = img.naturalHeight
+                      ctx?.drawImage(img, 0, 0)
+
+                      canvas.toBlob((blob) => {
+                        if (blob) {
+                          const url = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = `nano-banana-${Date.now()}.png`
+                          document.body.appendChild(a)
+                          a.click()
+                          document.body.removeChild(a)
+                          URL.revokeObjectURL(url)
+                        }
+                      }, 'image/png')
+                    }
+                  }}
+                  style={{
+                    padding: '0.6rem 1.2rem',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                  }}
+                >
+                  📥 {t.result.download}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  style={{
+                    padding: '0.6rem 1.2rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                  }}
+                >
+                  🔗 {t.result.share}
+                </button>
+              </div>
+            </div>
+          ) : result.text || result.content || result.message ? (
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '0.75rem',
+              padding: '1.2rem',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '0.95rem', color: '#ccc', lineHeight: '1.6' }}>
+                {result.text || result.content || result.message}
+              </p>
+            </div>
+          ) : null}
+        </div>
+        )}
+
+        </div>
+
+        {/* Right Panel - AI Options */}
+        <div className="right-panel" style={{ width: '350px' }}>
+          
+          <div style={{
+            background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+            borderRadius: '1.5rem',
+            padding: '1.5rem',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(16, 185, 129, 0.1)'
+          }}>
+
+            {/* 编辑风格 - 放最顶部 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+              borderRadius: '1rem',
+              padding: '1rem',
+              marginBottom: '1rem',
+              border: '1px solid rgba(16, 185, 129, 0.15)'
+            }}>
+              <h4 style={{ fontSize: '0.95rem', color: '#10b981', marginBottom: '0.75rem' }}>🎨 编辑风格</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))', gap: '0.45rem' }}>
+                {editingQuickPrompts.slice(0, 7).map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setPrompt(item.value)}
+                    style={{
+                      padding: '0.45rem 0.2rem',
+                      backgroundColor: index === 0 ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
+                      border: index === 0 ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid #333',
+                      borderRadius: '0.5rem',
+                      color: index === 0 ? '#10b981' : '#888',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.1rem',
+                      fontSize: '0.72rem',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#10b981'
+                      e.currentTarget.style.color = '#10b981'
+                      e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.06)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (index !== 0) {
+                        e.currentTarget.style.borderColor = '#333'
+                        e.currentTarget.style.color = '#888'
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }
+                    }}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {mode === 'upload' && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+                  例如: 将图片转换为油画风格，增加暖色调，让画面更加生动...
+                </p>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="描述你想要的编辑效果..."
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    background: 'linear-gradient(135deg, #1a1a1a, #222222)',
+                    border: '1px solid #333',
+                    borderRadius: '0.75rem',
+                    padding: '0.75rem',
+                    color: 'white',
+                    fontSize: '0.9rem',
+                    resize: 'vertical',
+                    transition: 'all 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#10b981'
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.2)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#333'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 提示词技巧 - 完善版 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #111111, #1a1a1a)',
+              borderRadius: '1rem',
+              padding: '1rem',
+              marginBottom: '1rem',
+              border: '1px solid rgba(255, 165, 0, 0.15)'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', color: '#ffa500', marginBottom: '0.6rem' }}>💡 提示词技巧</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ color: '#ccc', fontSize: '0.78rem', lineHeight: '1.5' }}>
+                  <strong style={{ color: '#10b981' }}>✅ 写法建议：</strong><br/>
+                  • 描述主体细节：材质、颜色、形状、大小<br/>
+                  • 指定拍摄角度：俯视/平视/侧拍/特写<br/>
+                  • 说明光影效果：自然光/柔光/戏剧光<br/>
+                  • 添加氛围描述：背景、场景、情绪感<br/>
+                  • 明确用途场景：电商主图/社媒海报/产品详情
+                </div>
+                <div style={{ color: '#999', fontSize: '0.78rem', lineHeight: '1.5' }}>
+                  <strong style={{ color: '#ff6b6b' }}>⚠️ 避免踩坑：</strong><br/>
+                  • ❌ 太简短（如只写"一个瓶子"）<br/>
+                  • ❌ 矛盾描述（如"暗调但明亮"）<br/>
+                  • ❌ 与参考图要求完全一致（需差异化）<br/>
+                  • ❌ 敏感或违规内容
+                </div>
+              </div>
+            </div>
+
+            <button
+              className={`generate-button ${loading ? 'loading' : 'button-glow'}`}
+              onClick={handleGenerate}
+              disabled={loading || isUploading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: (loading || isUploading)
+                  ? 'linear-gradient(135deg, #6b7280, #4b5563)'
+                  : 'linear-gradient(135deg, #10b981, #059669)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.75rem',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: (loading || isUploading) ? 'not-allowed' : 'pointer',
+                opacity: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.3s ease',
+                boxShadow: loading
+                  ? 'none'
+                  : '0 8px 25px rgba(16, 185, 129, 0.3)',
+                transform: loading ? 'none' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 35px rgba(16, 185, 129, 0.4)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'none'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.3)'
+                }
+              }}
+            >
+              {loading ? (
+                <>
+                  <span className="rotating">⚙️</span> {t.generate.generating}
+                </>
+              ) : isUploading ? (
+                <>
+                  <span className="rotating">📤</span> {t.generate.uploading}
+                </>
+              ) : (
+                <>
+                  开工！
+                </>
+              )}
+            </button>
+
+            <p style={{
+              textAlign: 'center',
+              marginTop: '1rem',
+              fontSize: '0.9rem',
+              color: '#ef4444'
+            }}>
+              {mode === 'text' ? t.generate.requirement : ''}
+            </p>
+          </div>
+        </div>
+        </div>
+
+      </div>
+      {error && (
+        <div className="error-section" style={{
+          padding: '2rem',
+          maxWidth: '1400px',
+          margin: '0 auto'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            textAlign: 'center',
+            border: '1px solid #ef4444'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>❌</div>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', color: 'white' }}>
+              生成失败
+            </h3>
+            <p style={{ color: '#fecaca', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              {error}
+            </p>
+            <button
+              onClick={() => setError('')}
+              style={{
+                marginTop: '1rem',
+                padding: '0.5rem 1rem',
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            border: '1px solid #ef4444',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                fontSize: '3rem',
+                marginBottom: '1rem'
+              }}>
+                ⚠️
+              </div>
+              <h3 style={{
+                fontSize: '1.5rem',
+                color: '#ef4444',
+                marginBottom: '0.5rem',
+                fontWeight: 'bold'
+              }}>
+                {errorModalTitle}
+              </h3>
+              <p style={{
+                color: '#ccc',
+                fontSize: '1rem',
+                lineHeight: '1.5',
+                margin: 0
+              }}>
+                {errorModalMessage}
+              </p>
+            </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => setShowErrorModal(false)}
+                style={{
+                  padding: '0.75rem 2rem',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#dc2626'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ef4444'
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {result && result.imageData && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          imageData={result.imageData}
+          mimeType={result.mimeType || 'image/png'}
+          t={t}
+        />
+      )}
+
+      {/* Free Quota Modal */}
+      <FreeQuotaModal
+        isOpen={showQuotaModal}
+        onClose={handleCloseQuotaModal}
+      />
+
+      {/* API Config Modal */}
+      {showApiConfig && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }} onClick={() => setShowApiConfig(false)}>
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '100%',
+            border: '1px solid #333',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: '#10b981',
+                margin: 0
+              }}>
+                ⚙️ API 配置
+              </h2>
+              <button
+                onClick={() => setShowApiConfig(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{
+              color: '#888',
+              fontSize: '0.95rem',
+              marginBottom: '1.5rem',
+              lineHeight: '1.5'
+            }}>
+              配置自定义的 API 密钥和 API 地址。留空则使用默认 Google Gemini 官方 API。
+              <br />
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#10b981', textDecoration: 'underline' }}
+              >
+                点击这里获取 Google Gemini API Key →
+              </a>
+            </p>
+
+            {/* Gemini API Config */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{
+                color: '#10b981',
+                fontSize: '1.1rem',
+                marginBottom: '1rem'
+              }}>
+                Gemini API
+              </h3>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#ccc',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={apiConfig.geminiApiKey}
+                  onChange={(e) => setApiConfig({ ...apiConfig, geminiApiKey: e.target.value })}
+                  placeholder="输入 Google Gemini API Key"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #333',
+                    borderRadius: '0.5rem',
+                    color: '#fff',
+                    fontSize: '0.95rem'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#ccc',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  API URL
+                </label>
+                <input
+                  type="text"
+                  value={apiConfig.geminiApiUrl}
+                  onChange={(e) => setApiConfig({ ...apiConfig, geminiApiUrl: e.target.value })}
+                  placeholder="https://generativelanguage.googleapis.com"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #333',
+                    borderRadius: '0.5rem',
+                    color: '#fff',
+                    fontSize: '0.95rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Doubao API Config */}
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{
+                color: '#10b981',
+                fontSize: '1.1rem',
+                marginBottom: '1rem'
+              }}>
+                Doubao API
+              </h3>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#ccc',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={apiConfig.doubaoApiKey}
+                  onChange={(e) => setApiConfig({ ...apiConfig, doubaoApiKey: e.target.value })}
+                  placeholder="可选：输入 Doubao API Key"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #333',
+                    borderRadius: '0.5rem',
+                    color: '#fff',
+                    fontSize: '0.95rem'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#ccc',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  API URL
+                </label>
+                <input
+                  type="text"
+                  value={apiConfig.doubaoApiUrl}
+                  onChange={(e) => setApiConfig({ ...apiConfig, doubaoApiUrl: e.target.value })}
+                  placeholder="可选：输入 Doubao API URL"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #333',
+                    borderRadius: '0.5rem',
+                    color: '#fff',
+                    fontSize: '0.95rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Info Box */}
+            <div style={{
+              backgroundColor: '#0a1a0a',
+              border: '1px solid #10b981',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <p style={{
+                color: '#888',
+                fontSize: '0.85rem',
+                margin: 0,
+                lineHeight: '1.5'
+              }}>
+                💡 提示：配置保存在浏览器本地存储中，不会上传到服务器。自定义 API 密钥优先级高于默认服务。
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setApiConfig(loadApiConfig())
+                  setShowApiConfig(false)
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#444'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#333'
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  saveApiConfig(apiConfig)
+                  setShowApiConfig(false)
+                  alert('配置已保存！')
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                保存配置
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const tagStyle: React.CSSProperties = {
+  padding: '0.25rem 0.75rem',
+  backgroundColor: 'transparent',
+  border: '1px solid #333',
+  borderRadius: '1.5rem',
+  color: '#888',
+  fontSize: '0.85rem',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  position: 'relative',
+  overflow: 'hidden'
+}
+
+const styleButtonStyle: React.CSSProperties = {
+  padding: '0.75rem',
+  border: '1px solid',
+  borderRadius: '0.75rem',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  transition: 'all 0.3s ease',
+  position: 'relative',
+  overflow: 'hidden'
+}

@@ -1,224 +1,191 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300
+
+/**
+ * 统一使用 Google Gemini 官方 API
+ * 模型: gemini-2.5-flash-image
+ * 接口: Gemini 原生 generateContent 格式
+ * 新增: count 参数支持批量生成多张图片
+ */
+
+const DEFAULT_MODEL = 'gemini-2.5-flash-image'
+const MAX_COUNT = 5
+
+async function callGeminiOnceWithImage(
+  prompt: string,
+  apiKey: string,
+  baseUrl: string,
+  imageDataArray?: string[] | null,
+  imageData?: string | null
+): Promise<{ imageData?: string; mimeType?: string; text?: string; error?: string; usageMetadata?: any }> {
+  
+  // 构建 parts
+  const parts: any[] = []
+
+  if (imageDataArray && Array.isArray(imageDataArray) && imageDataArray.length > 0) {
+    parts.push({ text: prompt })
+    for (const base64Data of imageDataArray) {
+      parts.push({
+        inline_data: {
+          mime_type: "image/jpeg",
+          data: base64Data
+        }
+      })
+    }
+  } else if (imageData) {
+    parts.push({ text: prompt })
+    parts.push({
+      inline_data: {
+        mime_type: "image/jpeg",
+        data: imageData,
+      }
+    })
+  } else {
+    parts.push({ text: prompt })
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 35000)
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/v1beta/models/${DEFAULT_MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            temperature: 0.7 + Math.random() * 0.25,
+            maxOutputTokens: 8192
+          }
+        }),
+        signal: controller.signal
+      }
+    )
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      return { error: `API错误 ${response.status}: ${errText.substring(0, 200)}` }
+    }
+
+    const data = await response.json()
+
+    if (data.candidates?.[0]?.content?.parts) {
+      const contentParts = data.candidates[0].content.parts
+      const imagePart = contentParts.find((part: any) => part.inlineData || part.inline_data)
+      const textPart = contentParts.find((part: any) => part.text)
+
+      if (imagePart) {
+        const imgData = imagePart.inlineData || imagePart.inline_data
+        return {
+          imageData: imgData.data,
+          mimeType: imgData.mimeType || imgData.mime_type || 'image/png',
+          text: textPart?.text || '',
+          usageMetadata: data.usageMetadata
+        }
+      } else if (textPart) {
+        return { text: textPart.text, error: '__TEXT_ONLY__', usageMetadata: data.usageMetadata }
+      }
+    }
+
+    return { error: '响应中无图片' }
+
+  } catch (e: any) {
+    clearTimeout(timeoutId)
+    if (e.name === 'AbortError') return { error: '请求超时(35s)' }
+    return { error: e.message || String(e) }
+  }
+}
 
 async function geminiHandler(request: NextRequest) {
   try {
-    const { prompt, imageData, imageDataArray, apiKey: customApiKey, apiUrl: customApiUrl, model: customModel } = await request.json()
+    const body = await request.json()
+    const prompt = body.prompt as string
+    const imageData = body.imageData as string | undefined
+    const imageDataArray = body.imageDataArray as string[] | undefined
+    const customApiKey = body.apiKey as string | undefined
+    const customApiUrl = body.apiUrl as string | undefined
+    const count = Math.min(MAX_COUNT, Math.max(1, Number(body.count) || 1))
 
     if (!prompt) {
       return NextResponse.json({ error: '请提供描述' }, { status: 400 })
     }
 
-    // 优先使用前端传来的自定义配置，否则使用环境变量
-    const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.MAYNOR_API_KEY
-    const apiUrl = customApiUrl || process.env.MAYNOR_API_URL || 'https://apipro.maynor1024.live'
-
-    // 模型映射：将前端模型名映射到实际的API模型名
-    const modelMap: { [key: string]: string } = {
-      'gemini-3-pro-image-preview': 'gemini-3-pro-image-preview',
-      'gemini': 'gemini-2.5-flash-image',
-      'gemini-2.5-flash-image': 'gemini-2.5-flash-image'
-    }
-
-    // 优先使用前端传递的模型，否则使用环境变量，最后使用默认值
-    const model = customModel ? modelMap[customModel] || customModel : (process.env.GEMINI_MODEL || 'gemini-2.5-flash-image')
+    const apiKey = customApiKey || process.env.GEMINI_API_KEY
+    const baseUrl = customApiUrl || process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com'
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'API配置缺失，请在页面右上角配置 API 密钥' }, { status: 500 })
+      return NextResponse.json({ error: 'API配置缺失' }, { status: 500 })
     }
 
-    console.log('Gemini 使用 API URL:', apiUrl)
-    console.log('使用模型:', model)
+    console.log(`[Gemini] Model=${DEFAULT_MODEL}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}`)
 
-    // 构建请求内容 - 根据maynor API文档格式
-    const parts: any[] = []
+    const images: Array<{ imageData: string; mimeType: string }> = []
+    const errors: string[] = []
+    let aggregateUsage: any = null
 
-    // 处理多图片输入
-    if (imageDataArray && Array.isArray(imageDataArray) && imageDataArray.length > 0) {
-      // 多图片模式
-      parts.push({ text: prompt })
-      imageDataArray.forEach((base64Data) => {
-        parts.push({
-          inline_data: {
-            mime_type: "image/jpeg",
-            data: base64Data
-          }
-        })
-      })
-    } else if (imageData) {
-      // 单图片模式（向后兼容）
-      parts.push({ text: prompt })
-      parts.push({
-        inline_data: {
-          mime_type: "image/jpeg",
-          data: imageData
-        }
-      })
-    } else {
-      // 纯文生图模式
-      parts.push({ text: `Create a picture: ${prompt}` })
-    }
+    for (let i = 0; i < count; i++) {
+      console.log(`[Gemini] Processing ${i + 1}/${count}...`)
+      
+      const result = await callGeminiOnceWithImage(prompt, apiKey, baseUrl, imageDataArray, imageData)
 
-    // 构建OpenAI兼容格式的消息
-    const messages = [{
-      role: "user",
-      content: [] as any[]
-    }]
-
-    // 添加文本内容
-    if (imageDataArray && Array.isArray(imageDataArray) && imageDataArray.length > 0) {
-      messages[0].content.push({ type: "text", text: prompt })
-      imageDataArray.forEach((base64Data) => {
-        messages[0].content.push({
-          type: "image_url",
-          image_url: { url: `data:image/jpeg;base64,${base64Data}` }
-        })
-      })
-    } else if (imageData) {
-      messages[0].content.push({ type: "text", text: prompt })
-      messages[0].content.push({
-        type: "image_url",
-        image_url: { url: `data:image/jpeg;base64,${imageData}` }
-      })
-    } else {
-      messages[0].content.push({ type: "text", text: `Create a picture: ${prompt}` })
-    }
-
-    // 根据是否有图片选择合适的API格式
-    let response: Response
-    
-    if (imageData || (imageDataArray && imageDataArray.length > 0)) {
-      // 图片编辑使用 Gemini 原生格式
-      response = await fetch(
-        `${apiUrl}/v1beta/models/${model}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: parts
-            }],
-            generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"],
-              temperature: 0.7,
-              maxOutputTokens: 1000
-            }
-          })
-        }
-      )
-    } else {
-      // 文生图使用 OpenAI 兼容格式
-      response = await fetch(
-        `${apiUrl}/v1/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: messages,
-            temperature: 0.7,
-            max_tokens: 4096
-          })
-        }
-      )
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('API错误:', errorData)
-      return NextResponse.json({ 
-        error: errorData.error?.message || '生成失败',
-        details: errorData 
-      }, { status: response.status })
-    }
-
-    const data = await response.json()
-    console.log('Gemini API响应:', JSON.stringify(data, null, 2))
-    
-    // 根据请求类型解析不同格式的响应
-    if (imageData || (imageDataArray && imageDataArray.length > 0)) {
-      // 解析 Gemini 原生格式响应
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        const content = data.candidates[0].content
-        
-        if (content.parts) {
-          const imagePart = content.parts.find((part: any) => part.inlineData || part.inline_data)
-          const textPart = content.parts.find((part: any) => part.text)
-          
-          if (imagePart) {
-            const imageData = imagePart.inlineData || imagePart.inline_data
-            return NextResponse.json({ 
-              imageData: imageData.data,
-              mimeType: imageData.mimeType || imageData.mime_type || 'image/png',
-              text: textPart?.text || '图片编辑已完成',
-              success: true
-            })
-          } else if (textPart) {
-            return NextResponse.json({ 
-              text: textPart.text,
-              message: '模型返回了文本响应，但没有生成图片'
-            })
-          }
+      if (result.usageMetadata) {
+        // 聚合 usageMetadata（累加 token count）
+        if (!aggregateUsage) {
+          aggregateUsage = { ...result.usageMetadata }
+        } else {
+          aggregateUsage.promptTokenCount += result.usageMetadata.promptTokenCount || 0
+          aggregateUsage.candidatesTokenCount += result.usageMetadata.candidatesTokenCount || 0
+          aggregateUsage.totalTokenCount += result.usageMetadata.totalTokenCount || 0
         }
       }
-    } else {
-      // 解析 OpenAI 格式响应
-      if (data.choices && data.choices[0]) {
-        const choice = data.choices[0]
-        const message = choice.message
-        
-        if (message && message.content) {
-          if (Array.isArray(message.content)) {
-            // 多部分内容
-            const imagePart = message.content.find((part: any) => part.type === 'image_url')
-            const textPart = message.content.find((part: any) => part.type === 'text')
-            
-            if (imagePart && imagePart.image_url) {
-              return NextResponse.json({ 
-                imageUrl: imagePart.image_url.url,
-                text: textPart?.text || '图片已生成'
-              })
-            }
-          } else if (typeof message.content === 'string') {
-            // 文本内容，检查是否包含base64图片
-            const text = message.content
-            const base64Match = text.match(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/);
-            
-            if (base64Match) {
-              return NextResponse.json({ 
-                imageData: base64Match[1],
-                mimeType: 'image/jpeg',
-                text: text
-              })
-            } else {
-              return NextResponse.json({ 
-                text: text,
-                message: '模型返回了文本响应'
-              })
-            }
-          }
-        }
+
+      if (result.error && result.error !== '__TEXT_ONLY__') {
+        errors.push(`第${i + 1}张失败: ${result.error}`)
+        continue
+      }
+
+      if (result.imageData) {
+        images.push({
+          imageData: result.imageData,
+          mimeType: result.mimeType || 'image/png'
+        })
+      }
+
+      if (i < count - 1) {
+        await new Promise(r => setTimeout(r, 1000))
       }
     }
 
-    return NextResponse.json({ 
-      error: '未能从响应中提取内容',
-      raw_response: data 
-    }, { status: 500 })
+    return NextResponse.json({
+      images,
+      success: images.length > 0,
+      model: DEFAULT_MODEL,
+      count: images.length,
+      requestedCount: count,
+      usageMetadata: aggregateUsage,
+      ...(errors.length > 0 ? { errors } : {}),
+      message: images.length === 0 
+        ? `全部失败: ${errors.join('; ')}` 
+        : images.length < count 
+          ? `成功 ${images.length}/${count} 张` 
+          : undefined
+    })
+
   } catch (error) {
     console.error('生成错误:', error)
     return NextResponse.json({
-      error: '生成失败',
-      details: error instanceof Error ? error.message : '未知错误'
+      error: '服务器内部错误',
+      details: error instanceof Error ? error.message : String(error)
     }, { status: 500 })
   }
 }

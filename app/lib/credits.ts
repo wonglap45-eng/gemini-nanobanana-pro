@@ -26,12 +26,12 @@ const USER_LEVELS = {
   },
   pro: {
     maxImages: 4,
-    apiKey: process.env.GEMINI_PRO_API_KEY || 'sk-2DYwd1hrA6ycqTu8RHlTsTBBBSFRdIVarkGQsjGWLttyNWua',
+    apiKey: process.env.GEMINI_PRO_API_KEY || process.env.GEMINI_API_KEY,
     priority: 'high'
   },
   unlimited: {
     maxImages: 10,
-    apiKey: process.env.GEMINI_PRO_API_KEY || 'sk-2DYwd1hrA6ycqTu8RHlTsTBBBSFRdIVarkGQsjGWLttyNWua',
+    apiKey: process.env.GEMINI_PRO_API_KEY || process.env.GEMINI_API_KEY,
     priority: 'highest'
   }
 }
@@ -89,7 +89,7 @@ export function getUserMaxImages(email: string): number {
 // 获取用户使用的API key
 export function getUserApiKey(email: string): string {
   const level = getUserLevel(email)
-  return USER_LEVELS[level].apiKey || process.env.MAYNOR_API_KEY || process.env.GEMINI_API_KEY || ''
+  return USER_LEVELS[level].apiKey || process.env.GEMINI_API_KEY || ''
 }
 
 // 获取或创建匿名用户

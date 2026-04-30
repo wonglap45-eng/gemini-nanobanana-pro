@@ -104,8 +104,8 @@ export default function FreeQuotaModal({ isOpen, onClose }: FreeQuotaModalProps)
 
         {/* 操作按钮 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <a
-            href="https://apipro.maynor1024.live/"
+            <a
+            href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"
             style={{
