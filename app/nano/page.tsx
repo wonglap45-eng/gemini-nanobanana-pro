@@ -3174,7 +3174,7 @@ const handleGenerate = async () => {
         </div>
       )}
 
-      {/* ── 后台侧边栏 ── */}
+      {/* ── 后台侧边栏 v2 ── */}
       {/* 触发按钮（右侧边缘竖条） */}
       <div
         onClick={() => setShowAdminPanel(!showAdminPanel)}
