@@ -507,13 +507,8 @@ not "a near-duplicate remake of the reference image."` },
   }
 
   const convertToBase64 = async (file: File): Promise<string> => {
-    // Compress large images first
-    const maxSizeMB = 2
-    let processedFile = file
-
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      processedFile = await compressImage(file)
-    }
+    // 所有图片都先压缩（避免 Gemini "input length too long"）
+    const processedFile = await compressImage(file, 800, 800, 0.75)
 
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -556,8 +551,7 @@ not "a near-duplicate remake of the reference image."` },
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          imageDataArray,
-          apiKey: mode === 'gpt' ? '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' : 'AIzaSyALG1iFkY8iz456waBR0Q2CL9ujWiJytNA'
+          imageDataArray
         })
       })
       const data = await response.json()
@@ -588,8 +582,7 @@ not "a near-duplicate remake of the reference image."` },
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: aiMode,
-          textRequirement: aiRequirementText,
-          apiKey: aiMode === 'gpt' ? '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' : 'AIzaSyALG1iFkY8iz456waBR0Q2CL9ujWiJytNA'
+          textRequirement: aiRequirementText
         })
       })
       const data = await response.json()
