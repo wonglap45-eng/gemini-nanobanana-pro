@@ -556,8 +556,7 @@ not "a near-duplicate remake of the reference image."` },
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          imageDataArray,
-          apiKey: mode === 'gpt' ? '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' : 'AIzaSyALG1iFkY8iz456waBR0Q2CL9ujWiJytNA'
+          imageDataArray
         })
       })
       const data = await response.json()
@@ -588,8 +587,7 @@ not "a near-duplicate remake of the reference image."` },
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: aiMode,
-          textRequirement: aiRequirementText,
-          apiKey: aiMode === 'gpt' ? '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' : 'AIzaSyALG1iFkY8iz456waBR0Q2CL9ujWiJytNA'
+          textRequirement: aiRequirementText
         })
       })
       const data = await response.json()
