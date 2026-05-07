@@ -127,7 +127,19 @@ async function geminiHandler(request: NextRequest) {
       return NextResponse.json({ error: 'API配置缺失' }, { status: 500 })
     }
 
-    console.log(`[Gemini] Model=${DEFAULT_MODEL}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}`)
+    // 计算图片数据大小（用于排查 "input length too long"）
+    let totalImageSize = 0
+    if (imageDataArray) {
+      imageDataArray.forEach((b64, idx) => {
+        const bytes = Math.ceil(b64.length * 0.75) // base64 → 原始字节估算
+        totalImageSize += bytes
+        console.log(`[Gemini] Image[${idx}] base64_len=${b64.length}, est_bytes=${bytes}`)
+      })
+    } else if (imageData) {
+      totalImageSize = Math.ceil(imageData.length * 0.75)
+      console.log(`[Gemini] Image base64_len=${imageData.length}, est_bytes=${totalImageSize}`)
+    }
+    console.log(`[Gemini] Model=${DEFAULT_MODEL}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}, TotalImageBytes=${totalImageSize}, EstRequestKB=${Math.ceil((JSON.stringify({prompt, imageData: imageData || imageDataArray?.[0]?.substring(0,50) || ''}).length + totalImageSize) / 1024)}`)
 
     const images: Array<{ imageData: string; mimeType: string }> = []
     const errors: string[] = []
