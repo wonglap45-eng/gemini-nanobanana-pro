@@ -25,7 +25,7 @@ async function callGPTImageGeneration(
   imageDataArray?: string[] | null
 ): Promise<{ imageData?: string; mimeType?: string; error?: string }> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 60000)
+  const timeoutId = setTimeout(() => controller.abort(), 90000)
 
   try {
     // 构建消息
@@ -50,7 +50,7 @@ async function callGPTImageGeneration(
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-image-2',
+        model: 'grok-4-image',
         messages
       }),
       signal: controller.signal
@@ -146,7 +146,7 @@ async function callGeminiOnceWithImage(
           contents: [{ role: "user", parts }],
           generationConfig: {
             responseModalities: ["TEXT", "IMAGE"],
-            temperature: 0.7 + Math.random() * 0.25,
+            temperature: 0.4,
             maxOutputTokens: 8192
           }
         }),
@@ -213,7 +213,7 @@ async function geminiHandler(request: NextRequest) {
     if (engine === 'gpt') {
       apiKey = customApiKey || process.env.DIGIFOSSIL_API_KEY
       baseUrl = customApiUrl || process.env.DIGIFOSSIL_API_URL || 'https://www.digifossil.com/v1'
-      modelLabel = 'gpt-image-2'
+      modelLabel = 'grok-4-image'
     } else {
       apiKey = customApiKey || process.env.GEMINI_API_KEY
       baseUrl = customApiUrl || process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com'
