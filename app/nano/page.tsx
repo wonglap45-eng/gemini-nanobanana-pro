@@ -507,7 +507,7 @@ not "a near-duplicate remake of the reference image."` },
   }
 
   const convertToBase64 = async (file: File): Promise<string> => {
-    // 所有图片都先压缩（避免 Gemini "input length too long"）- 512×512 JPEG 0.7
+    // 所有图片都先压缩（避免 Gemini "input length too long"）- 512×512 JPEG 0.7 [build: 2026-06-04]
     const processedFile = await compressImage(file, 512, 512, 0.7)
 
     return new Promise((resolve, reject) => {
