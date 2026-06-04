@@ -812,38 +812,55 @@ const handleGenerate = async () => {
     return styles[style]
   }
 
+  // 获取图片 src（兼容 base64 和 URL 两种格式）
+  const getImageSrc = (img: any) => {
+    if (img.imageUrl) return img.imageUrl
+    return `data:${img.mimeType || 'image/png'};base64,${img.imageData}`
+  }
+
   // 下载图片
-  const downloadImage = (imageData: string, mimeType: string = 'image/png') => {
-    const link = document.createElement('a')
-    link.href = `data:${mimeType};base64,${imageData}`
-    link.download = `generated-${Date.now()}.${mimeType.split('/')[1]}`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const downloadImage = (img: any) => {
+    const src = getImageSrc(img)
+    if (img.imageUrl) {
+      // URL 图片：直接打开下载
+      const link = document.createElement('a')
+      link.href = src
+      link.download = `generated-${Date.now()}.png`
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      const link = document.createElement('a')
+      link.href = src
+      link.download = `generated-${Date.now()}.${(img.mimeType || 'image/png').split('/')[1]}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
   }
 
   // 分享图片
-  const shareImage = async (imageData: string, mimeType: string = 'image/png') => {
+  const shareImage = async (img: any) => {
+    const src = getImageSrc(img)
     if (navigator.share && navigator.canShare) {
       try {
-        const blob = await (await fetch(`data:${mimeType};base64,${imageData}`)).blob()
-        const file = new File([blob], `generated-${Date.now()}.${mimeType.split('/')[1]}`, { type: mimeType })
-        
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'AI生成的图片',
-            text: '查看这张AI生成的图片'
-          })
+        if (img.imageUrl) {
+          // URL 图片：分享链接
+          await navigator.share({ title: 'AI生成的图片', text: '查看这张AI生成的图片', url: img.imageUrl })
+        } else {
+          const blob = await (await fetch(src)).blob()
+          const file = new File([blob], `generated-${Date.now()}.png`, { type: img.mimeType || 'image/png' })
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'AI生成的图片' })
+          }
         }
       } catch (error) {
         console.error('分享失败:', error)
-        // 降级到复制链接
-        copyToClipboard(`data:${mimeType};base64,${imageData}`)
+        copyToClipboard(src)
       }
     } else {
-      // 降级到复制链接
-      copyToClipboard(`data:${mimeType};base64,${imageData}`)
+      copyToClipboard(src)
     }
   }
 
@@ -2525,7 +2542,7 @@ const handleGenerate = async () => {
                     <img
                       id={`generated-image-${idx}`}
                       className="result-image"
-                      src={`data:${img.mimeType || 'image/png'};base64,${img.imageData}`}
+                      src={getImageSrc(img)}
                       alt={`Generated ${idx + 1}`}
                       style={{
                         width: '100%',
@@ -2536,7 +2553,7 @@ const handleGenerate = async () => {
                         cursor: 'pointer',
                         transition: 'transform 0.2s ease',
                       }}
-                      onClick={() => setLightboxImage({ src: `data:${img.mimeType || 'image/png'};base64,${img.imageData}`, index: idx })}
+                      onClick={() => setLightboxImage({ src: getImageSrc(img), index: idx })}
                       onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
                       onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
                     />
@@ -2553,7 +2570,7 @@ const handleGenerate = async () => {
                     }}>
                       <span style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>#{idx + 1}</span>
                       <button
-                        onClick={(e) => { e.stopPropagation(); downloadImage(img.imageData, img.mimeType || 'image/png') }}
+                        onClick={(e) => { e.stopPropagation(); downloadImage(img) }}
                         style={{
                           padding: '0.25rem 0.6rem', border: 'none', borderRadius: '0.35rem',
                           background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',

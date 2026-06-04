@@ -23,9 +23,9 @@ async function callGPTImageGeneration(
   apiKey: string,
   apiUrl: string,
   imageDataArray?: string[] | null
-): Promise<{ imageData?: string; mimeType?: string; error?: string }> {
+): Promise<{ imageData?: string; imageUrl?: string; mimeType?: string; error?: string }> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 90000)
+  const timeoutId = setTimeout(() => controller.abort(), 55000) // Vercel Hobby 60s 限制内
 
   try {
     // 构建消息
@@ -75,19 +75,10 @@ async function callGPTImageGeneration(
     const imageUrl = urlMatch[1]
     console.log(`[GPT] Image URL: ${imageUrl}`)
 
-    // 下载图片转 base64
-    const imgResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) })
-    if (!imgResponse.ok) {
-      return { error: `图片下载失败: ${imgResponse.status}` }
-    }
-
-    const buffer = await imgResponse.arrayBuffer()
-    const base64 = Buffer.from(buffer).toString('base64')
-    const contentType = imgResponse.headers.get('content-type') || 'image/png'
-
+    // GPT 图片直接返回 URL（下载+转码耗时长，超 Vercel 60s 限制）
     return {
-      imageData: base64,
-      mimeType: contentType
+      imageUrl,
+      mimeType: 'image/png'
     }
 
   } catch (e: any) {
@@ -226,14 +217,14 @@ async function geminiHandler(request: NextRequest) {
 
     console.log(`[${engine.toUpperCase()}] Model=${modelLabel}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}`)
 
-    const images: Array<{ imageData: string; mimeType: string }> = []
+    const images: Array<{ imageData?: string; imageUrl?: string; mimeType: string }> = []
     const errors: string[] = []
     let aggregateUsage: any = null
 
     for (let i = 0; i < count; i++) {
       console.log(`[${engine}] Processing ${i + 1}/${count}...`)
       
-      let result: { imageData?: string; mimeType?: string; error?: string; usageMetadata?: any; text?: string }
+      let result: { imageData?: string; imageUrl?: string; mimeType?: string; error?: string; usageMetadata?: any; text?: string }
 
       if (engine === 'gpt') {
         const gptResult = await callGPTImageGeneration(prompt, apiKey, baseUrl, imageDataArray)
@@ -258,9 +249,10 @@ async function geminiHandler(request: NextRequest) {
         continue
       }
 
-      if (result.imageData) {
+      if (result.imageData || result.imageUrl) {
         images.push({
           imageData: result.imageData,
+          imageUrl: result.imageUrl,
           mimeType: result.mimeType || 'image/png'
         })
       }
