@@ -50,7 +50,7 @@ async function callGPTImageGeneration(
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'grok-4-image',
+        model: 'gpt-image-2',
         messages
       }),
       signal: controller.signal
@@ -204,7 +204,7 @@ async function geminiHandler(request: NextRequest) {
     if (engine === 'gpt') {
       apiKey = customApiKey || process.env.DIGIFOSSIL_API_KEY
       baseUrl = customApiUrl || process.env.DIGIFOSSIL_API_URL || 'https://www.digifossil.com/v1'
-      modelLabel = 'grok-4-image'
+      modelLabel = 'gpt-image-2'
     } else {
       apiKey = customApiKey || process.env.GEMINI_API_KEY
       baseUrl = customApiUrl || process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com'
