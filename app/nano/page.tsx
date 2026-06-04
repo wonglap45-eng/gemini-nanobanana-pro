@@ -10,10 +10,12 @@ import { loadApiConfig, saveApiConfig, type ApiConfig } from '../lib/api-config'
 
 type Mode = 'upload' | 'text'
 type Style = 'none' | 'enhance' | 'artistic' | 'anime' | 'photo'
+type Engine = 'gemini' | 'gpt'
 
 export default function NanoPage() {
   const { language, setLanguage, t } = useLanguage()
   const [mode, setMode] = useState<Mode>('text')
+  const [engine, setEngine] = useState<Engine>('gemini')
   const [prompt, setPrompt] = useState('')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -655,7 +657,7 @@ const handleGenerate = async () => {
 
       // 构建基础请求体（每次都发 count=1）
       const buildRequestBody = () => {
-        const base: any = { prompt: finalPrompt, count: 1, timestamp: Date.now() }
+        const base: any = { prompt: finalPrompt, count: 1, engine, timestamp: Date.now() }
         if (imageDataArray) base.imageDataArray = imageDataArray
         if (apiConfig.geminiApiKey) base.apiKey = apiConfig.geminiApiKey
         if (apiConfig.geminiApiUrl) base.apiUrl = apiConfig.geminiApiUrl
@@ -1009,6 +1011,43 @@ const handleGenerate = async () => {
         </button>
       </div>
 
+      {/* Engine Selector: Gemini / GPT */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+        <button
+          onClick={() => setEngine('gemini')}
+          style={{
+            padding: '0.35rem 1rem',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            borderRadius: '0.5rem',
+            border: engine === 'gemini' ? 'none' : '1px solid #3b82f6',
+            background: engine === 'gemini' ? '#3b82f6' : 'transparent',
+            color: engine === 'gemini' ? 'white' : '#3b82f6',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            opacity: engine === 'gemini' ? 1 : 0.6
+          }}
+        >
+          🧠 Gemini
+        </button>
+        <button
+          onClick={() => setEngine('gpt')}
+          style={{
+            padding: '0.35rem 1rem',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            borderRadius: '0.5rem',
+            border: engine === 'gpt' ? 'none' : '1px solid #10b981',
+            background: engine === 'gpt' ? '#10b981' : 'transparent',
+            color: engine === 'gpt' ? 'white' : '#10b981',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            opacity: engine === 'gpt' ? 1 : 0.6
+          }}
+        >
+          🤖 GPT
+        </button>
+      </div>
 
 
       {/* Main Content */}

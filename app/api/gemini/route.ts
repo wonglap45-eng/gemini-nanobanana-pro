@@ -8,10 +8,94 @@ export const maxDuration = 300
  * 模型: gemini-2.5-flash-image
  * 接口: Gemini 原生 generateContent 格式
  * 新增: count 参数支持批量生成多张图片
+ * 新增: engine 参数支持 gemini / gpt 双引擎
  */
 
 const DEFAULT_MODEL = 'gemini-2.5-flash-image'
 const MAX_COUNT = 5
+
+/**
+ * GPT 图片生成 (digifossil gpt-image-2)
+ * 返回格式: ![image](url) → 下载图片转 base64
+ */
+async function callGPTImageGeneration(
+  prompt: string,
+  apiKey: string,
+  apiUrl: string,
+  imageDataArray?: string[] | null
+): Promise<{ imageData?: string; mimeType?: string; error?: string }> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 60000)
+
+  try {
+    // 构建消息
+    const messages: any[] = [{ role: 'user', content: prompt }]
+    
+    if (imageDataArray && imageDataArray.length > 0) {
+      // 图生图模式：发送参考图 + prompt
+      const contentParts: any[] = [{ type: 'text', text: prompt }]
+      for (const b64 of imageDataArray) {
+        contentParts.push({
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${b64}` }
+        })
+      }
+      messages[0] = { role: 'user', content: contentParts }
+    }
+
+    const response = await fetch(`${apiUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-2',
+        messages
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      return { error: `GPT图片API错误 ${response.status}: ${errText.substring(0, 200)}` }
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || ''
+
+    // 解析 markdown 图片链接: ![image](url)
+    const urlMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/)
+    if (!urlMatch) {
+      return { error: `未识别的图片格式: ${content.substring(0, 100)}` }
+    }
+
+    const imageUrl = urlMatch[1]
+    console.log(`[GPT] Image URL: ${imageUrl}`)
+
+    // 下载图片转 base64
+    const imgResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) })
+    if (!imgResponse.ok) {
+      return { error: `图片下载失败: ${imgResponse.status}` }
+    }
+
+    const buffer = await imgResponse.arrayBuffer()
+    const base64 = Buffer.from(buffer).toString('base64')
+    const contentType = imgResponse.headers.get('content-type') || 'image/png'
+
+    return {
+      imageData: base64,
+      mimeType: contentType
+    }
+
+  } catch (e: any) {
+    clearTimeout(timeoutId)
+    if (e.name === 'AbortError') return { error: 'GPT图片请求超时(60s)' }
+    return { error: e.message || String(e) }
+  }
+}
 
 async function callGeminiOnceWithImage(
   prompt: string,
@@ -115,49 +199,57 @@ async function geminiHandler(request: NextRequest) {
     const customApiKey = body.apiKey as string | undefined
     const customApiUrl = body.apiUrl as string | undefined
     const count = Math.min(MAX_COUNT, Math.max(1, Number(body.count) || 1))
+    const engine = (body.engine as string) || 'gemini'
 
     if (!prompt) {
       return NextResponse.json({ error: '请提供描述' }, { status: 400 })
     }
 
-    const apiKey = customApiKey || process.env.GEMINI_API_KEY
-    const baseUrl = customApiUrl || process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com'
+    // 根据 engine 选择 API 配置
+    let apiKey: string | undefined
+    let baseUrl: string
+    let modelLabel: string
+
+    if (engine === 'gpt') {
+      apiKey = customApiKey || process.env.DIGIFOSSIL_API_KEY
+      baseUrl = customApiUrl || process.env.DIGIFOSSIL_API_URL || 'https://www.digifossil.com/v1'
+      modelLabel = 'gpt-image-2'
+    } else {
+      apiKey = customApiKey || process.env.GEMINI_API_KEY
+      baseUrl = customApiUrl || process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com'
+      modelLabel = DEFAULT_MODEL
+    }
 
     if (!apiKey) {
       return NextResponse.json({ error: 'API配置缺失' }, { status: 500 })
     }
 
-    // 计算图片数据大小（用于排查 "input length too long"）
-    let totalImageSize = 0
-    if (imageDataArray) {
-      imageDataArray.forEach((b64, idx) => {
-        const bytes = Math.ceil(b64.length * 0.75) // base64 → 原始字节估算
-        totalImageSize += bytes
-        console.log(`[Gemini] Image[${idx}] base64_len=${b64.length}, est_bytes=${bytes}`)
-      })
-    } else if (imageData) {
-      totalImageSize = Math.ceil(imageData.length * 0.75)
-      console.log(`[Gemini] Image base64_len=${imageData.length}, est_bytes=${totalImageSize}`)
-    }
-    console.log(`[Gemini] Model=${DEFAULT_MODEL}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}, TotalImageBytes=${totalImageSize}, EstRequestKB=${Math.ceil((JSON.stringify({prompt, imageData: imageData || imageDataArray?.[0]?.substring(0,50) || ''}).length + totalImageSize) / 1024)}`)
+    console.log(`[${engine.toUpperCase()}] Model=${modelLabel}, Count=${count}, PromptLength=${prompt.length}, HasImage=${!!(imageData || imageDataArray)}`)
 
     const images: Array<{ imageData: string; mimeType: string }> = []
     const errors: string[] = []
     let aggregateUsage: any = null
 
     for (let i = 0; i < count; i++) {
-      console.log(`[Gemini] Processing ${i + 1}/${count}...`)
+      console.log(`[${engine}] Processing ${i + 1}/${count}...`)
       
-      const result = await callGeminiOnceWithImage(prompt, apiKey, baseUrl, imageDataArray, imageData)
+      let result: { imageData?: string; mimeType?: string; error?: string; usageMetadata?: any; text?: string }
 
-      if (result.usageMetadata) {
-        // 聚合 usageMetadata（累加 token count）
-        if (!aggregateUsage) {
-          aggregateUsage = { ...result.usageMetadata }
-        } else {
-          aggregateUsage.promptTokenCount += result.usageMetadata.promptTokenCount || 0
-          aggregateUsage.candidatesTokenCount += result.usageMetadata.candidatesTokenCount || 0
-          aggregateUsage.totalTokenCount += result.usageMetadata.totalTokenCount || 0
+      if (engine === 'gpt') {
+        const gptResult = await callGPTImageGeneration(prompt, apiKey, baseUrl, imageDataArray)
+        result = gptResult
+      } else {
+        const geminiResult = await callGeminiOnceWithImage(prompt, apiKey, baseUrl, imageDataArray, imageData)
+        result = geminiResult
+        
+        if (geminiResult.usageMetadata) {
+          if (!aggregateUsage) {
+            aggregateUsage = { ...geminiResult.usageMetadata }
+          } else {
+            aggregateUsage.promptTokenCount += geminiResult.usageMetadata.promptTokenCount || 0
+            aggregateUsage.candidatesTokenCount += geminiResult.usageMetadata.candidatesTokenCount || 0
+            aggregateUsage.totalTokenCount += geminiResult.usageMetadata.totalTokenCount || 0
+          }
         }
       }
 
@@ -181,7 +273,7 @@ async function geminiHandler(request: NextRequest) {
     return NextResponse.json({
       images,
       success: images.length > 0,
-      model: DEFAULT_MODEL,
+      model: modelLabel,
       count: images.length,
       requestedCount: count,
       usageMetadata: aggregateUsage,

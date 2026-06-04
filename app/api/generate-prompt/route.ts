@@ -54,7 +54,9 @@ Requirements:
 Return JSON only:
 {"cn": "Chinese prompt text", "en": "English prompt text - must be real English"}`
 
-async function generateWithGPT(imageDataArray: string[], apiKey: string, textRequirement?: string) {
+async function generateWithGPT(imageDataArray: string[], apiKey: string, textRequirement?: string, apiUrl?: string) {
+  const baseUrl = apiUrl || 'https://www.digifossil.com/v1'
+  const model = 'gpt-5.4-mini'
   const isTextMode = !!textRequirement && (!imageDataArray || imageDataArray.length === 0)
   const systemPrompt = isTextMode ? GPT_TEXT_SYSTEM_PROMPT : GPT_SYSTEM_PROMPT
   const userText = isTextMode
@@ -74,16 +76,14 @@ async function generateWithGPT(imageDataArray: string[], apiKey: string, textReq
     }
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://gemini-nanobanana-pro.vercel.app',
-      'X-Title': 'Nano Banana Pro'
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
+      model,
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 3000
     })
@@ -188,10 +188,10 @@ async function translateToEnglish(chineseText: string, mode: 'gpt' | 'gemini', a
   const prompt = `Translate the following Chinese text into a professional English image generation prompt for AI tools like Gemini or DALL-E. Output ONLY the English translation, nothing else:\n\n${chineseText}`
 
   if (mode === 'gpt') {
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const resp = await fetch('https://www.digifossil.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://gemini-nanobanana-pro.vercel.app' },
-      body: JSON.stringify({ model: 'openai/gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 2000 })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'gpt-5.4-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 2000 })
     })
     if (!resp.ok) throw new Error(`Translation GPT error ${resp.status}`)
     const data = await resp.json()
@@ -276,11 +276,12 @@ export async function POST(request: NextRequest) {
     let result: { cn: string; en: string }
 
     if (mode === 'gpt') {
-      const apiKey = customApiKey || process.env.OPENROUTER_API_KEY
+      const apiKey = customApiKey || process.env.DIGIFOSSIL_API_KEY
       if (!apiKey) {
-        return NextResponse.json({ error: 'OpenRouter API Key 未配置' }, { status: 500 })
+        return NextResponse.json({ error: 'DigiFossil API Key 未配置' }, { status: 500 })
       }
-      result = await generateWithGPT(imageDataArray || [], apiKey, textRequirement)
+      const gptApiUrl = customApiUrl || process.env.DIGIFOSSIL_API_URL || 'https://www.digifossil.com/v1'
+      result = await generateWithGPT(imageDataArray || [], apiKey, textRequirement, gptApiUrl)
     } else {
       const apiKey = customApiKey || process.env.GEMINI_API_KEY
       if (!apiKey) {
@@ -294,7 +295,7 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ en field contains Chinese, auto-translating to English...')
       try {
         const apiKeyForTrans = mode === 'gpt'
-          ? (customApiKey || process.env.OPENROUTER_API_KEY || '')
+          ? (customApiKey || process.env.DIGIFOSSIL_API_KEY || '')
           : (customApiKey || process.env.GEMINI_API_KEY || '')
         result.en = await translateToEnglish(result.cn || result.en, mode, apiKeyForTrans)
         console.log('✅ Translation completed')
